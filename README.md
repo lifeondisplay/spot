@@ -1,5 +1,15 @@
 # spot-cli
 
+ferramenta em linha de comando para customizar o cliente do spotify.
+suporte para windows, macos e linux.
+
+**features:**
+
+- alterar as cores de toda a ui
+- injetar css para customização avançada
+- habilitar algumas features adicionais, escondidas
+- remover componentes para melhorar a performance
+
 ## instalação
 
 1. baixe o pacote correto para seu sistema operacional: https://github.com/lifeondisplay/spot/releases
@@ -33,7 +43,7 @@ echo 'spot=~/spot/spot' >> .bashrc
 
 você pode rodar `spot` em qualquer lugar
 
-## uso
+## uso básico
 
 rode uma vez sem comando para gerar o arquivo de configuração
 
@@ -41,19 +51,21 @@ rode uma vez sem comando para gerar o arquivo de configuração
 spot
 ```
 
-e então:
+certifique-se de que o arquivo de configuração foi criado com sucesso e não há erro, então execute:
 
 ```bash
-spot backup
+spot backup apply enable-devtool
 ```
 
-e finalmente:
+e a partir de agora, após alterar as cores em `color.ini` ou no css em `user.css`, você só precisa executar:
 
 ```bash
-spot apply
+spot update
 ```
 
-depois de alterar o tema de cor e o css, rode `apply` novamente
+para atualizar o seu tema.
+
+no spotify, pressione <kbd>ctrl</kbd> + <kbd>shift</kbd> + <kbd>r</kbd>/<kbd>command</kbd> + <kbd>shift</kbd> + <kbd>r</kbd> para recarregar e receber atualização visual do seu tema.
 
 ## customização
 
@@ -61,7 +73,8 @@ depois de alterar o tema de cor e o css, rode `apply` novamente
 
 está localizado em:
 **windows**: `%userprofile%\.spot\config.ini`
-**linux e macos**: `~/.spot/config.ini`
+**linux:** `~/.spot/config.ini`  
+**macos:** `~/spot_data/config.ini`  
 
 #### temas
 
@@ -69,7 +82,8 @@ há 2 espaços onde você pode inserir seus temas:
 
 1. a pasta `Themes` no diretório home
 **windows**: `%userprofile%\.spot\Themes\`
-**linux e macos**: `~/.spot/Themes/`
+**linux** `~/.spot/Themes/`  
+**macos:** `~/spot_data/Themes`    
 2. a pasta `Themes` no diretório do executável spot
 
 caso haja 2 temas contendo o mesmo nome, o tema no diretório home é o priorizado.
@@ -93,7 +107,5 @@ go build src/spot.go
 
 ## em breve
 
-- implementação de recursos futuros
 - sass
-- assistir a alteração dos arquivos de temas e aplicar automaticamente
 - injetar extensões e aplicativos customizados
