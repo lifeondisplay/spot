@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"../apply"
 	"../status/backup"
@@ -56,6 +55,7 @@ func Apply() {
 	}
 
 	themeFolder := getThemeFolder(themeName.MustString("SpotDefault"))
+
 	apply.UserCSS(
 		appFolder,
 		themeFolder,
@@ -63,18 +63,23 @@ func Apply() {
 		replaceColors
 	)
 
-	featureSec := cfg.GetSection("AdditionalOptions")
+	extentionList := featureSection.Key("extensions").Strings("|")
+
 	apply.AdditionalOptions(appFolder, apply.Flag{
-		ExperimentalFeatures: featureSec.Key("experimental_features").MustInt(0) == 1,
-		FastUserSwitching:    featureSec.Key("fastUser_switching").MustInt(0) == 1,
-		Home:                 featureSec.Key("home").MustInt(0) == 1,
-		LyricAlwaysShow:      featureSec.Key("lyric_always_show").MustInt(0) == 1,
-		LyricForceNoSync:     featureSec.Key("lyric_force_no_sync").MustInt(0) == 1,
-		MadeForYouHub:        featureSec.Key("made_for_you_hub").MustInt(0) == 1,
-		Radio:                featureSec.Key("radio").MustInt(0) == 1,
-		SongPage:             featureSec.Key("song_page").MustInt(0) == 1,
-		VisHighFramerate:     featureSec.Key("visualization_high_framerate").MustInt(0) == 1
+		ExperimentalFeatures: featureSection.Key("experimental_features").MustInt(0) == 1,
+		FastUserSwitching:    featureSection.Key("fastUser_switching").MustInt(0) == 1,
+		Home:                 featureSection.Key("home").MustInt(0) == 1,
+		LyricAlwaysShow:      featureSection.Key("lyric_always_show").MustInt(0) == 1,
+		LyricForceNoSync:     featureSection.Key("lyric_force_no_sync").MustInt(0) == 1,
+		MadeForYouHub:        featureSection.Key("made_for_you_hub").MustInt(0) == 1,
+		Radio:                featureSection.Key("radio").MustInt(0) == 1,
+		SongPage:             featureSection.Key("song_page").MustInt(0) == 1,
+		VisHighFramerate:     featureSection.Key("visualization_high_framerate").MustInt(0) == 1,
+		
+		Extension:            extentionList
 	})
+
+	pushExtensions(extentionList...)
 
 	utils.PrintSuccess("o spotify progrediu!")
 	utils.RestartSpotify(spotifyPath)
@@ -98,7 +103,50 @@ func UpdateCSS() {
 		settingSection.Key("replace_colors").MustInt(0) == 1,
 	)
 
-	date := time.Now()
+	utils.PrintSuccess(utils.PrependTime("css customizado está atualizado"))
+}
 
-	utils.PrintSuccess(fmt.Sprintf("user.css é atualizado em %02d:%02d:%02d", date.Hour(), date.Minute(), date.Second()))
+// updateallextension
+func UpdateAllExtension() {
+	pushExtensions(featureSection.Key("extensions").Strings("|")...)
+
+	utils.PrintSuccess(utils.PrependTime("All extensions are updated."))
+}
+
+func getExtensionPath(name string) (string, error) {
+	extFilePath := filepath.Join(utils.GetExecutableDir(), "Extensions", name)
+
+	if _, err := os.Stat(extFilePath); err == nil {
+		return extFilePath, nil
+	}
+
+	extFilePath = filepath.Join(spotFolder, "Extensions", name)
+
+	if _, err := os.Stat(extFilePath); err == nil {
+		return extFilePath, nil
+	}
+
+	return "", errors.New("extensão não encontrada")
+}
+
+func pushExtensions(list ...string) {
+	if len(list) > 0 {
+		zlinkFolder := filepath.Join(spotifyPath, "Apps", "zlink")
+
+		for _, v := range list {
+			extPath, err := getExtensionPath(v)
+
+			if err != nil {
+				utils.PrintError(`extensão "` + v + `" não encontrada.`)
+
+				continue
+			}
+
+			if err = utils.CopyFile(extPath, zlinkFolder); err != nil {
+				utils.PrintError(err.Error())
+
+				continue
+			}
+		}
+	}
 }

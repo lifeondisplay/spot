@@ -292,8 +292,12 @@ func exposeAPIs(input string) string {
 		// registra o evento de mudança de progresso
 		input = utils.Replace(
 			input,
-			playerUI[0]+`\.prototype\._onProgressBarProgress=function.+?\{`,
-			`${0}Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onprogress"));`
+			playerUI[0]+`\.prototype\._onProgressBarProgress=function\(([\w_]+)\)\{`,
+			`${0}
+	const progressEvent = new Event("onprogress");
+	progressEvent.data = ${1}.value;
+	Spot.Player.dispatchEvent(progressEvent);
+`,
 		)
 	}
 
@@ -305,15 +309,15 @@ func exposeAPIs(input string) string {
 	)
 
 	// encontra o símbolo event dispatcher (eventsymbol[0]) e event creator (eventsymbol[1])
-	eventSymbols := findSymbol("EventDispatcher and Event Creatir", input, []string{
+	eventSymbols := findSymbol("EventDispatcher and Event Creator", input, []string{
 		`([\w_]+)\.default\.dispatchEvent\(new ([\w_]+)\.default\([\w_]+\.default\.NAVIGATION_OPEN_URI`,
 		`([\w_]+)\.default\.dispatchEvent\(new ([\w_]+)\.default\("show\-notification\-bubble"`}
 	)
 
-	showNotification := ""
+	eventDispatcher := ""
 	if eventSymbols != nil {
-		showNotification = fmt.Sprintf(
-			`Spot.showNotification = (text) => {%s.default.dispatchEvent(new %s.default("show-notification-bubble", {i18n: text}))};`,
+		eventDispatcher = fmt.Sprintf(
+			`Spot.EventDispatcher=%s.default;Spot.Event=%s.default;`,
 			eventSymbols[0],
 			eventSymbols[1]
 		)
@@ -323,7 +327,7 @@ func exposeAPIs(input string) string {
 	input = utils.Replace(
 		input,
 		`(const [\w_]+=([\w_]+)\.default\.get\([\w_]+\);)`,
-		`${1}Spot.LocalStorage=${2}.default;`+showNotification
+		`${1}Spot.LocalStorage=${2}.default;`+eventDispatcher
 	)
 
 	// encontra os símbolos player (playercosmossymbols[0]) e cosmos api (playercosmossymbols[1])
@@ -356,21 +360,39 @@ func exposeAPIs(input string) string {
 	input = utils.Replace(
 		input,
 		`this\.playing\([\w_]+\.is_playing&&![\w_]+\.is_paused\).+?;`,
-		`${0}(this.playing()!==this._isPlaying)&&(this._isPlaying=this.playing(),Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onplaypause")));`
+		`${0}(this.playing()!==this._isPlaying)&&(this._isPlaying=this.playing(),Spot.Player.dispatchEvent(new Event("onplaypause")));`
 	)
 
 	// registra evento de mudança de música
 	input = utils.Replace(
 		input,
-		`this\._uri=[\w_]+\.uri,this\._trackMetadata=[\w_]+\.metadata`,
-		`${0},Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("songchange"))`
+		`(updatePlayerState=function\(([\w_]+)\)\{if\(![\w_]+\)return;)(.*this\._uri=[\w_]+\.uri,this\._trackMetadata=[\w_]+\.metadata)`,
+		`${1}Spot.Player.data=${2};${3},Spot.Player.dispatchEvent(new Event("songchange"))`
 	)
 
 	// registra o evento de mudança do app
 	input = utils.Replace(
 		input,
-		`(_onActivate\(\)\{)([\w_]+\.default\.dispatch\([\w_]+\.default\.activatePage)`,
-		`${1}const appChangeEvent=new Event("appchange");appChangeEvent.data=this._state._uri;Spicetify.Player.dispatchEvent(appChangeEvent);${2}`
+		`(_onStateUpdate\(([\w_]+)\)\{)`,
+		`${1}
+	const appEvent = new Event("appchange");
+
+	appEvent.data = {
+		id: this._pageId,
+		uri: ${2}.getURI(),
+		isEmbeddedApp: this.isEmbeddedApp(),
+		container: this.getContainer(),
+	};
+
+	const eventCB = ({data: info}) => {
+		if (info && info.type === "notify_loaded") {
+			Spot.Player.dispatchEvent(appEvent);
+			window.removeEventListener("message", eventCB)
+		}
+	};
+
+	window.addEventListener("message", eventCB);
+`,
 	)
 
 	// vazamento de playbackcontrol para spot.playbackcontrol
@@ -387,140 +409,121 @@ func exposeAPIs(input string) string {
 		"${1}"
 	)
 
+	input = utils.Replace(
+		input,
+		`\([\w_]+\|\|console\.warn\.bind\(console\)\)`,
+		` void`
+	)
+
+	// vazamento de registro de atalho de teclado para spot.keyboard
+	input = utils.Replace(
+		input,
+		`(_registerKeyboardShortcuts=function\(\)\{)(([\w_]+)\.registerShortcut)`,
+		"${1}Spot.Keyboard=${3};${2}"
+	)
+
 	return input
 }
 
 const spotPlayerJS = `
-Spot.Player.seek=(p)=>{if(p<=1)p=Math.round(p*(Spot.Player.data?Spot.Player.data.track.metadata.duration:0));this.seek(p)};
-Spot.Player.getProgressMs=()=>this.progressbar.getRealValue();
-Spot.Player.getProgressPercent=()=>this.progressbar.getPercentage();
-Spot.Player.getDuration=()=>this.progressbar.getMaxValue();
-Spot.Player.skipForward=(a=15e3)=>Spot.Player.seek(Spot.Player.getProgressMs()+a);
-Spot.Player.skipBack=(a=15e3)=>Spot.Player.seek(Spot.Player.getProgressMs()-a);
-Spot.Player.setVolume=(v)=>this.changeVolume(v, false);
-Spot.Player.increaseVolume=()=>this.increaseVolume();
-Spot.Player.decreaseVolume=()=>this.decreaseVolume();
-Spot.Player.getVolume=()=>this.volumebar.getValue();
-Spot.Player.next=()=>this._doSkipToNext();
-Spot.Player.back=()=>this._doSkipToPrevious();
-Spot.Player.togglePlay=()=>this._doTogglePlay();
-Spot.Player.play=()=>{!this.playing() && this._doTogglePlay();};
-Spot.Player.pause=()=>{this.playing() && this._doTogglePlay();};
-Spot.Player.isPlaying=()=>this.progressbar.isPlaying();
-Spot.Player.toggleShuffle=()=>this.toggleShuffle();
-Spot.Player.getShuffle=()=>this.shuffle();
-Spot.Player.setShuffle=(b)=>{this.shuffle(b)};
-Spot.Player.toggleRepeat=()=>this.toggleRepeat();
-Spot.Player.getRepeat=()=>this.repeat();
-Spot.Player.setRepeat=(r)=>{this.repeat(r)};
-Spot.Player.getMute=()=>this.mute();
-Spot.Player.toggleMute=()=>this._doToggleMute();
-Spot.Player.setMute=(b)=>{this.volumeEnabled()&&this.changeVolume(this._unmutedVolume,b)};
-Spot.Player.thumbUp=()=>this.thumbUp();
-Spot.Player.getThumbUp=()=>this.trackThumbedUp();
-Spot.Player.thumbDown=()=>this.thumbDown();
-Spot.Player.getThumbDown=()=>this.trackThumbedDown();
-Spot.Player.formatTime=(ms)=>this._formatTime(ms);
-Spot.Player.eventListeners={};
-
-Spot.Player.addEventListener= (type, callback) => {
-	if (!(type in Spot.Player.eventListeners)) {
-		Spot.Player.eventListeners[type] = [];
-	}
-	Spot.Player.eventListeners[type].push(callback)
-};
-
-Spot.Player.removeEventListener = (type, callback) => {
-    if (!(type in Spot.Player.eventListeners)) {
-        return;
-    }
-
-    var stack = Spot.Player.eventListeners[type];
-
-    for (let i = 0; i < stack.length; i++) {
-        if (stack[i] === callback) {
-            stack.splice(i, 1);
-            return;
-        }
-    }
-};
-
-Spot.Player.dispatchEvent = (event) => {
-    if (!(event.type in Spot.Player.eventListeners)) {
-        return true;
-    }
-
-    var stack = Spot.Player.eventListeners[event.type];
-
-    for (let i = 0; i < stack.length; i++) {
-		if (typeof stack[i] === "function") {
-			stack[i](event);
-		}
-    }
-
-    return !event.defaultPrevented;
-};
+this.seek&&this.duration&&(Spot.Player.seek=(p)=>{if(p<=1)p=Math.round(p*this.duration());this.seek(p)});
+this.progressbar.getRealValue&&(Spot.Player.getProgress=()=>this.progressbar.getRealValue());
+this.progressbar.getPercentage&&(Spot.Player.getProgressPercent=()=>this.progressbar.getPercentage());
+this.duration&&(Spot.Player.getDuration=()=>this.duration());
+this.changeVolume&&(Spot.Player.setVolume=(v)=>{this.changeVolume(v, false)});
+this.increaseVolume&&(Spot.Player.increaseVolume=()=>{this.increaseVolume()});
+this.decreaseVolume&&(Spot.Player.decreaseVolume=()=>{this.decreaseVolume()});
+this.volume&&(Spot.Player.getVolume=()=>this.volume());
+this._doSkipToNext&&(Spot.Player.next=()=>{this._doSkipToNext()});
+this._doSkipToPrevious&&(Spot.Player.back=()=>{this._doSkipToPrevious()});
+this._doTogglePlay&&(Spot.Player.togglePlay=()=>{this._doTogglePlay()});
+this.playing&&(Spot.Player.isPlaying=()=>this.playing());
+this.toggleShuffle&&(Spot.Player.toggleShuffle=()=>{this.toggleShuffle()});
+this.shuffle&&(Spot.Player.getShuffle=()=>this.shuffle());
+this.shuffle&&(Spot.Player.setShuffle=(b)=>{this.shuffle(b)});
+this.toggleRepeat&&(Spot.Player.toggleRepeat=()=>{this.toggleRepeat()});
+this.repeat&&(Spot.Player.getRepeat=()=>this.repeat());
+this.repeat&&(Spot.Player.setRepeat=(r)=>{this.repeat(r)});
+this.mute&&(Spot.Player.getMute=()=>this.mute());
+this._doToggleMute&&(Spot.Player.toggleMute=()=>{this._doToggleMute()});
+this.changeVolume&&(Spot.Player.setMute=(b)=>{this.changeVolume(this._unmutedVolume,b)});
+this._formatTime&&(Spot.Player.formatTime=(ms)=>this._formatTime(ms));
+Spot.Player.origin=this;
 `
 
 const spotQueueJS = `
-Spot.addToQueue = (uri,callback) => {
-	uri = Spot.LibURI.from(uri);
+const getAlbumAsync = (inputUri) => new Promise((resolve, reject) => {
+	this.getAlbumTracks(inputUri, (err, tracks) => err ? reject(err) : resolve(tracks))
+});
 
-	if (uri.type === Spot.LibURI.Type.ALBUM) {
-		this.getAlbumTracks(uri, (err,tracks) => {
-			if (err) {
-				console.log("Spot.addToQueue", err);
+this.getAlbumTracks && this.queueTracks && (Spot.addToQueue = async (uri) => {
+	const trackUris = [];
 
-				return;
-			}
-
-			this.queueTracks(tracks, callback)
-		})
-	} else if (uri.type === Spot.LibURI.Type.TRACK || uri.type === Spot.LibURI.Type.EPISODE) {
-		this.queueTracks([uri], callback);
-	} else {
-		console.log("Spot.addToQueue: Only Track, Album, Episode URIs are accepted");
-		
-		return;
-	}
-};
-
-Spot.removeFromQueue = (uri, callback) => {
-    if (Spot.Queue) {
-        let indices = [];
-
-        const uriObj = Spot.LibURI.from(uri);
-
-        if (uriObj.type === Spot.LibURI.Type.ALBUM) {
-            this.getAlbumTracks(uriObj, (err, tracks) => {
-                if (err) {
-                    console.log(err);
-
-                    return;
-                }
-
-                tracks.forEach((trackUri) => {
-					Spot.Queue.next_tracks.forEach((nt, index) => {
-						trackUri == nt.uri && indices.push(index);
-					})
-				})
-            })
-        } else if (uriObj.type === Spot.LibURI.Type.TRACK || uriObj.type === Spot.LibURI.Type.EPISODE) {
-            Spot.Queue.next_tracks.forEach((track, index) => {
-				track.uri == uri && indices.push(index)
-			})
-        } else {
-			console.log("Spot.removeFromQueue: Only Album, Track and Episode URIs are accepted")
+	const add = async (inputUri) => {
+		const uriObj = Spot.LibURI.from(inputUri);
+		if (!uriObj) {
+			console.error("Invalid URI. Skipped ", inputUri);
 			return;
 		}
 
-        indices = indices.reduce((a, b) => {
-            if (a.indexOf(b) < 0) {
-                a.push(b)
-            }
-            return a
-        }, []);
-        this.removeTracksFromQueue(indices, callback)
-    }
-};
+		if (uriObj.type === Spot.LibURI.Type.ALBUM) {
+			const tracks = await getAlbumAsync(inputUri);
+			trackUris.push(...tracks);
+		} else if (uriObj.type === Spot.LibURI.Type.TRACK || uriObj.type === Spot.LibURI.Type.EPISODE) {
+			trackUris.push(inputUri);
+		} else {
+			console.error("Only Track, Album, Episode URIs are accepted. Skipped ", inputUri);
+		}
+	}
+
+	if (uri instanceof Array) {
+		for (const u of uri) await add(u)
+	} else {
+		await add(uri)
+	}
+
+	if (trackUris.length < 1) {
+		throw "No track to add.";
+	} else {
+		this.queueTracks(trackUris, err2 => {if (err2) throw err2});
+	}
+});
+
+this.getAlbumTracks && this.removeTracksFromQueue && (Spot.removeFromQueue = async (uri) => {
+    if (!Spot.Queue) {
+		throw "Spot.Queue is not available. Post an Issue on Github to inform me about it.";
+	}
+
+	const indices = new Set();
+	const add = async (inputUri) => {
+		const uriObj = Spot.LibURI.from(inputUri);
+		if (!uriObj) {
+			console.error("Invalid URI. Skipped ", inputUri);
+			return;
+		}
+
+		if (uriObj.type === Spot.LibURI.Type.ALBUM) {
+			const tracks = await getAlbumAsync(inputUri);
+			tracks.forEach((trackUri) => {
+				Spot.Queue.next_tracks.forEach((t, i) => t.uri == trackUri && indices.add(i))
+			})
+		} else if (uriObj.type === Spot.LibURI.Type.TRACK || uriObj.type === Spot.LibURI.Type.EPISODE) {
+			Spot.Queue.next_tracks.forEach((t, i) => t.uri == inputUri && indices.add(i))
+		} else {
+			console.error("Only Album, Track and Episode URIs are accepted. Skipped ", inputUri);
+		}
+	}
+
+	if (uri instanceof Array) {
+		for (const u of uri) await add(u)
+	} else {
+		await add(uri)
+	}
+
+	if (indices.length < 1) {
+		throw "No track found in queue to remove.";
+	} else {
+		this.removeTracksFromQueue([...indices], err2 => {if (err2) throw err2});
+	}
+});
 `

@@ -25,19 +25,19 @@ func init() {
 
 	log.SetFlags(0)
 
-	quiet := false
-	for _, v := range os.Args {
-		if v == "-q" || v == "--quiet" {
-			quiet = true
+	quiet := utils.FindFlag(os.Args, "-q", "--quite")
 
-			break
-		}
+	if quiet {
+		log.SetOutput(ioutil.Discard)
+	} else {
+		// suporte de output colorido para o windows
+		log.SetOutput(colorable.NewColorableStdout())
 	}
 
 	cmd.Init(quiet)
 
 	if len(os.Args) < 2 {
-		help()
+		utils.PrintInfo(`rode "spot -h" para lista de comandos.`)
 
 		os.Exit(0)
 	}
@@ -45,12 +45,17 @@ func init() {
 	for k, v := range os.Args {
 		switch v {
 			case "-c", "--config":
-				log.Print(cmd.GetConfigPath())
+				fmt.Print(cmd.GetConfigPath())
 
 				os.Exit(0)
 
 			case "-h", "--help":
-				if len(os.Args) > k+1 && os.Args[k+1] == "config" {
+				kind := ""
+				if len(os.Args) > k+1 {
+					kind = os.Args[k+1]
+				}
+
+				if kind == "config" {
 					helpConfig()
 				} else {
 					help()
@@ -59,17 +64,10 @@ func init() {
 				os.Exit(0)
 
 			case "-v", "--version":
-				log.Print(version)
+				fmt.Print(version)
 
 				os.Exit(0)
 		}
-	}
-
-	if quiet {
-		log.SetOutput(ioutil.Discard)
-	} else {
-		// suporta a saída do output em cores para sistemas windows
-		log.SetOutput(colorable.NewColorableStdout())
 	}
 }
 
@@ -89,7 +87,11 @@ func main() {
 				cmd.Apply()
 
 			case "update":
-				cmd.UpdateCSS()
+				if utils.FindFlag(args, "-e", "--extension") {
+					cmd.UpdateAllExtension()
+				} else {
+					cmd.UpdateCSS()
+				}
 
 			case "restore":
 				cmd.Restore()
@@ -101,7 +103,11 @@ func main() {
 				cmd.SetDevTool(false)
 
 			case "watch":
-				cmd.Watch()
+				if utils.FindFlag(args, "-e", "--extension") {
+					cmd.WatchExtensions()
+				} else {
+					cmd.Watch()
+				}
 
 			default:
 				if argv[0] != '-' {
@@ -136,6 +142,7 @@ watch               entra no modo de espectador. automaticamente atualiza o css 
 
 FLAGS
 -q, --quiet         modo silencioso (sem output).
+-e, --extension     utilize com "update" ou "watch" para focar nas extensões.
 -c, --config        retorna o caminho do arquivo de configuração e saia.
 -h, --help          gera este texto de ajuda e saia.
 -v, --version       retorna o número da versão e saia.

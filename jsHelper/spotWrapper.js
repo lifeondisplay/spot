@@ -1,40 +1,81 @@
 const Spot = {
     Player: {
-        addEventListener: undefined,
+        addEventListener: (type, callback) => {
+            if (!(type in Spot.Player.eventListeners)) {
+                Spot.Player.eventListeners[type] = [];
+            }
+
+            Spot.Player.eventListeners[type].push(callback)
+        },
+
         back: undefined,
         data: undefined,
         decreaseVolume: undefined,
-        dispatchEvent: undefined,
-        eventListeners: undefined,
+
+        dispatchEvent: (event) => {
+            if (!(event.type in Spot.Player.eventListeners)) {
+                return true;
+            }
+
+            var stack = Spot.Player.eventListeners[event.type];
+
+            for (let i = 0; i < stack.length; i++) {
+                if (typeof stack[i] === "function") {
+                    stack[i](event);
+                }
+            }
+
+            return !event.defaultPrevented;
+        },
+
+        eventListeners: {},
         formatTime: undefined,
         getDuration: undefined,
+        getHeart: () => {Spot.LiveAPI(Spot.Player.data.track.uri).get("added")},
         getMute: undefined,
         getProgressMs: undefined,
         getProgressPercent: undefined,
         getRepeat: undefined,
         getShuffle: undefined,
-        getThumbDown: undefined,
-        getThumbUp: undefined,
         getVolume: undefined,
         increaseVolume: undefined,
         isPlaying: undefined,
         next: undefined,
-        pause: undefined,
-        play: undefined,
-        removeEventListener: undefined,
+
+        pause: () => {Spot.Player.isPlaying() && Spot.Player.togglePlay()},
+        play: () => {!Spot.Player.isPlaying() && Spot.Player.togglePlay()},
+
+        removeEventListener: (type, callback) => {
+            if (!(type in Spot.Player.eventListeners)) {
+                return;
+            }
+
+            var stack = Spot.Player.eventListeners[type];
+
+            for (let i = 0; i < stack.length; i++) {
+                if (stack[i] === callback) {
+                    stack.splice(i, 1);
+
+                    return;
+                }
+            }
+        },
+
         seek: undefined,
         setMute: undefined,
         setRepeat: undefined,
         setShuffle: undefined,
         setVolume: undefined,
-        skipBack: undefined,
-        skipForward: undefined,
-        thumbDown: undefined,
-        thumbUp: undefined,
+
+        skipBack: (amount = 15e3) => {Spot.Player.seek(Spot.Player.getProgressMs() - amount)},
+        skipForward: (amount = 15e3) => {Spot.Player.seek(Spot.Player.getProgressMs() + amount)},
+        
+        toggleHeart: () => {document.querySelector('[data-interaction-target="save-remove-button"]').click()},
+        
         toggleMute: undefined,
         togglePlay: undefined,
         toggleRepeat: undefined,
-        toggleShuffle: undefined
+        toggleShuffle: undefined,
     },
 
     addToQueue: undefined,
@@ -43,7 +84,15 @@ const Spot = {
 
     CosmosAPI: undefined,
 
+    Event: undefined,
+
+    EventDispatcher: undefined,
+
+    extractColors: undefined,
+
     getAudioData: undefined,
+
+    Keyboard: undefined,
 
     LibURI: undefined,
 
@@ -57,13 +106,21 @@ const Spot = {
 
     removeFromQueue: undefined,
 
+    showNotification: (text) => {
+        Spot.EventDispatcher.dispatchEvent(
+            new Spot.Event(Spot.Event.TYPES.SHOW_NOTIFICATION_BUBBLE, { i18n: text }))
+    },
+
     test: () => {
         const SPOT_METHOD = [
             "Player",
             "addToQueue",
             "BridgeAPI",
             "CosmosAPI",
+            "Event",
+            "EventDispatcher",
             "getAudioData",
+            "Keyboard",
             "LibURI",
             "LiveAPI",
             "LocalStorage",
@@ -82,13 +139,12 @@ const Spot = {
             "eventListeners",
             "formatTime",
             "getDuration",
+            "getHeart",
             "getMute",
-            "getProgressMs",
+            "getProgress",
             "getProgressPercent",
             "getRepeat",
             "getShuffle",
-            "getThumbDown",
-            "getThumbUp",
             "getVolume",
             "increaseVolume",
             "isPlaying",
@@ -103,8 +159,7 @@ const Spot = {
             "setVolume",
             "skipBack",
             "skipForward",
-            "thumbDown",
-            "thumbUp",
+            "toggleHeart",
             "toggleMute",
             "togglePlay",
             "toggleRepeat",
@@ -115,29 +170,49 @@ const Spot = {
 
         SPOT_METHOD.forEach((method) => {
             if (Spot[method] === undefined || Spot[method] === null) {
-                console.error(`Spot.${method} não está disponível. abra um problema no repositório spot para informar melhor sobre isso.`);
-
+                console.error(`Spot.${method} is not available. Please open an issue in Spot repository to inform me about it.`)
                 count--;
             }
         })
 
-        console.log(`${count}/${SPOT_METHOD.length} os métodos e os objetos do spot estão ok.`)
+        console.log(`${count}/${SPOT_METHOD.length} Spot methods and objects are OK.`)
 
         count = PLAYER_METHOD.length;
 
         PLAYER_METHOD.forEach((method) => {
             if (Spot.Player[method] === undefined || Spot.Player[method] === null) {
-                console.error(`Spot.Player.${method} não está disponível. abra um problema no repositório spot para informar melhor sobre isso.`);
-
+                console.error(`Spot.Player.${method} is not available. Please open an issue in  repository to inform me about it.`)
                 count--;
             }
         })
 
-        console.log(`${count}/${PLAYER_METHOD.length} os métodos e objetos de Spot.Player estão ok.`);
+        console.log(`${count}/${PLAYER_METHOD.length} Spot.Player methods and objects are OK.`)
     }
 }
 
 Spot.LibURI = (function () {
+    /**
+    * Copyright (c) 2017 Spotify AB
+    *
+    * Fast base62 encoder/decoder.
+    *
+    * Usage:
+    *
+    *   Base62.toHex('1C0pasJ0dS2Z46GKh2puYo') // -> '34ff970885ca8fa02c0d6e459377d5d0'
+    *                         ^^^
+    *                          |
+    *               Length-22 base62-encoded ID.
+    *         Lengths other than 22 or invalid base62 IDs
+    *                  are not supported.
+    *
+    *   Base62.fromHex('34ff970885ca8fa02c0d6e459377d5d0') // -> '1C0pasJ0dS2Z46GKh2puYo'
+    *                         ^^^
+    *                          |
+    *               Length-32 hex-encoded ID.
+    *         Lengths other than 32 are not supported.
+    *
+    * Written by @ludde, programatically tested and documented by @felipec.
+    */
     var Base62 = (function () {
         // alfabetos
         var HEX16 = '0123456789abcdef';
@@ -146,24 +221,20 @@ Spot.LibURI = (function () {
         // fragmentos hexadecimais
         var HEX256 = [];
         HEX256.length = 256;
-
         for (var i = 0; i < 256; i++) {
             HEX256[i] = HEX16[i >> 4] + HEX16[i & 0xf];
         }
 
-        // tabelas de consulta
+        // Look-up tables
         var ID62 = [];
         ID62.length = 128;
-
         for (var i = 0; i < BASE62.length; ++i) {
             ID62[BASE62.charCodeAt(i)] = i;
         }
-
         var ID16 = [];
         for (var i = 0; i < 16; i++) {
             ID16[HEX16.charCodeAt(i)] = i;
         }
-
         for (var i = 0; i < 6; i++) {
             ID16['ABCDEF'.charCodeAt(i)] = 10 + i;
         }
@@ -171,26 +242,21 @@ Spot.LibURI = (function () {
         return {
             toHex: function (s) {
                 if (s.length !== 22) {
-                    // só é possível analisar ids base62 com comprimento == 22
-                    //
-                    // ids base62 inválidos causarão um crash no output
-
+                    // Can only parse base62 ids with length == 22.
+                    // Invalid base62 ids will lead to garbage in the output.
                     return null;
                 }
 
                 // 1 / (2^32)
                 var MAX_INT_INV = 2.3283064365386963e-10;
-
                 // 2^32
                 var MAX_INT = 0x100000000;
-
                 // 62^3
                 var P62_3 = 238328;
 
                 var p0, p1, p2, p3;
                 var v;
-
-                // os primeiros 7 caracteres cabem em 2 ^ 53
+                // First 7 characters fit in 2^53
                 // prettier-ignore
                 p0 =
                     ID62[s.charCodeAt(0)] * 56800235584 +  // * 62^6
@@ -202,7 +268,6 @@ Spot.LibURI = (function () {
                     ID62[s.charCodeAt(6)];                 // * 62^0
                 p1 = (p0 * MAX_INT_INV) | 0;
                 p0 -= p1 * MAX_INT;
-
                 // 62^10 < 2^64
                 v =
                     ID62[s.charCodeAt(7)] * 3844 +
@@ -210,7 +275,6 @@ Spot.LibURI = (function () {
                     ID62[s.charCodeAt(9)];
                 (p0 = p0 * P62_3 + v), (p0 = p0 - (v = (p0 * MAX_INT_INV) | 0) * MAX_INT);
                 p1 = p1 * P62_3 + v;
-
                 // 62^13 < 2^96
                 v =
                     ID62[s.charCodeAt(10)] * 3844 +
@@ -219,7 +283,6 @@ Spot.LibURI = (function () {
                 (p0 = p0 * P62_3 + v), (p0 = p0 - (v = (p0 * MAX_INT_INV) | 0) * MAX_INT);
                 (p1 = p1 * P62_3 + v), (p1 = p1 - (v = (p1 * MAX_INT_INV) | 0) * MAX_INT);
                 p2 = v;
-
                 // 62^16 < 2^96
                 v =
                     ID62[s.charCodeAt(13)] * 3844 +
@@ -228,7 +291,6 @@ Spot.LibURI = (function () {
                 (p0 = p0 * P62_3 + v), (p0 = p0 - (v = (p0 * MAX_INT_INV) | 0) * MAX_INT);
                 (p1 = p1 * P62_3 + v), (p1 = p1 - (v = (p1 * MAX_INT_INV) | 0) * MAX_INT);
                 p2 = p2 * P62_3 + v;
-
                 // 62^19 < 2^128
                 v =
                     ID62[s.charCodeAt(16)] * 3844 +
@@ -238,7 +300,6 @@ Spot.LibURI = (function () {
                 (p1 = p1 * P62_3 + v), (p1 = p1 - (v = (p1 * MAX_INT_INV) | 0) * MAX_INT);
                 (p2 = p2 * P62_3 + v), (p2 = p2 - (v = (p2 * MAX_INT_INV) | 0) * MAX_INT);
                 p3 = v;
-
                 v =
                     ID62[s.charCodeAt(19)] * 3844 +
                     ID62[s.charCodeAt(20)] * 62 +
@@ -248,11 +309,9 @@ Spot.LibURI = (function () {
                 (p2 = p2 * P62_3 + v), (p2 = p2 - (v = (p2 * MAX_INT_INV) | 0) * MAX_INT);
                 (p3 = p3 * P62_3 + v), (p3 = p3 - (v = (p3 * MAX_INT_INV) | 0) * MAX_INT);
                 if (v) {
-                    // carry não é permitido
-
+                    // carry not allowed
                     return null;
                 }
-
                 // prettier-ignore
                 return HEX256[p3 >>> 24] + HEX256[(p3 >>> 16) & 0xFF] + HEX256[(p3 >>> 8) & 0xFF] + HEX256[(p3) & 0xFF] +
                     HEX256[p2 >>> 24] + HEX256[(p2 >>> 16) & 0xFF] + HEX256[(p2 >>> 8) & 0xFF] + HEX256[(p2) & 0xFF] +
@@ -263,23 +322,18 @@ Spot.LibURI = (function () {
             fromHex: function (s) {
                 var i;
                 var p0 = 0, p1 = 0, p2 = 0;
-
                 for (i = 0; i < 10; i++) p2 = p2 * 16 + ID16[s.charCodeAt(i)];
                 for (i = 0; i < 11; i++) p1 = p1 * 16 + ID16[s.charCodeAt(i + 10)];
                 for (i = 0; i < 11; i++) p0 = p0 * 16 + ID16[s.charCodeAt(i + 21)];
-
                 if (isNaN(p0 + p1 + p2)) {
                     return null;
                 }
-
                 var P16_11 = 17592186044416; // 16^11
                 var INV_62 = 1.0 / 62;
 
                 var acc;
                 var ret = '';
-
                 i = 0;
-
                 for (; i < 7; ++i) {
                     acc = p2;
                     p2 = Math.floor(acc * INV_62);
@@ -289,7 +343,6 @@ Spot.LibURI = (function () {
                     p0 = Math.floor(acc * INV_62);
                     ret = BASE62[acc - p0 * 62] + ret;
                 }
-
                 p1 += p2 * P16_11;
                 for (; i < 15; ++i) {
                     acc = p1;
@@ -298,27 +351,24 @@ Spot.LibURI = (function () {
                     p0 = Math.floor(acc * INV_62);
                     ret = BASE62[acc - p0 * 62] + ret;
                 }
-
                 p0 += p1 * P16_11;
                 for (; i < 21; ++i) {
                     acc = p0;
                     p0 = Math.floor(acc * INV_62);
                     ret = BASE62[acc - p0 * 62] + ret;
                 }
-
                 return BASE62[p0] + ret;
             },
 
-            // expõe as tabelas de pesquisa
-            HEX256: HEX256, // número -> 'hh'
-
-            ID16: ID16,  // código de caracteres hexadecimais -> 0..15
-            ID62: ID62  // código de caracteres base62 -> 0..61
+            // Expose the lookup tables
+            HEX256: HEX256, // number -> 'hh'
+            ID16: ID16,  // hexadecimal char code -> 0..15
+            ID62: ID62,  // base62 char code -> 0..61
         };
     })();
 
     /**
-     * o prefixo uri para uris
+     * The URI prefix for URIs.
      *
      * @const
      * @private
@@ -326,7 +376,7 @@ Spot.LibURI = (function () {
     var URI_PREFIX = 'spotify:';
 
     /**
-     * o prefixo do url para play
+     * The URL prefix for Play.
      *
      * @const
      * @private
@@ -334,7 +384,7 @@ Spot.LibURI = (function () {
     var PLAY_HTTP_PREFIX = 'http://play.spotify.com/';
 
     /**
-     * o prefixo do url https para play
+     * The HTTPS URL prefix for Play.
      *
      * @const
      * @private
@@ -342,7 +392,7 @@ Spot.LibURI = (function () {
     var PLAY_HTTPS_PREFIX = 'https://play.spotify.com/';
 
     /**
-     * o prefixo do url para open
+     * The URL prefix for Open.
      *
      * @const
      * @private
@@ -350,19 +400,19 @@ Spot.LibURI = (function () {
     var OPEN_HTTP_PREFIX = 'http://open.spotify.com/';
 
     /**
-     * o prefixo do url https para open
+     * The HTTPS URL prefix for Open.
      *
      * @const
      * @private
      */
     var OPEN_HTTPS_PREFIX = 'https://open.spotify.com/';
 
-    var ERROR_INVALID = new TypeError('uri de spotify inválido!');
-    var ERROR_NOT_IMPLEMENTED = new TypeError('não implementado!');
+    var ERROR_INVALID = new TypeError('Invalid Spotify URI!');
+    var ERROR_NOT_IMPLEMENTED = new TypeError('Not implemented!');
 
 
     /**
-     * o formato do uri a ser analisado
+     * The format for the URI to parse.
      *
      * @enum {number}
      * @private
@@ -373,7 +423,7 @@ Spot.LibURI = (function () {
     };
 
     /**
-     * representa o resultado de uma operação de divisão de uri
+     * Represents the result of a URI splitting operation.
      *
      * @typedef {{
      *    format: Format,
@@ -385,10 +435,10 @@ Spot.LibURI = (function () {
     var SplittedURI;
 
     /**
-     * divide um uri de uma string ou url (http/https) em componentes, ignorando o prefixo
+     * Split an string URI or HTTP/HTTPS URL into components, skipping the prefix.
      *
-     * @param {string} str o uri de string a ser dividido
-     * @return {SplittedURI} o uri analisado
+     * @param {string} str A string URI to split.
+     * @return {SplittedURI} The parsed URI.
      * @private
      */
     var _splitIntoComponents = function (str) {
@@ -423,7 +473,7 @@ Spot.LibURI = (function () {
             components = str.slice(URI_PREFIX.length).split(':');
             format = Format.URI;
         } else {
-            // para urls http, ignorar qualquer argumento de string de consulta
+            // For HTTP URLs, ignore any query string argument
             str = str.split('?')[0];
 
             if (str.indexOf(PLAY_HTTP_PREFIX) === 0) {
@@ -437,7 +487,6 @@ Spot.LibURI = (function () {
             } else {
                 throw ERROR_INVALID;
             }
-
             format = Format.URL;
         }
 
@@ -453,11 +502,11 @@ Spot.LibURI = (function () {
     };
 
     /**
-     * codifica um componente de acordo com um formato
+     * Encodes a component according to a format.
      *
-     * @param {string} component uma sequência de componentes
-     * @param {Format} format um formato
-     * @return {string} uma sequência de componentes codificada
+     * @param {string} component A component string.
+     * @param {Format} format A format.
+     * @return {string} An encoded component string.
      * @private
      */
     var _encodeComponent = function (component, format) {
@@ -466,9 +515,8 @@ Spot.LibURI = (function () {
             component = component.replace(/%20/g, '+');
         }
 
-        // codificar caracteres que não são codificados por padrão pelo
-        // encodeuricomponent, mas que a especificação uri do spotify
-        // codifica: !'*()
+        // encode characters that are not encoded by default by encodeURIComponent
+        // but that the Spotify URI spec encodes: !'*()
         component = component.replace(/[!'()]/g, escape);
         component = component.replace(/\*/g, '%2A');
 
@@ -476,11 +524,11 @@ Spot.LibURI = (function () {
     };
 
     /**
-     * decodifica um componente de acordo com um formato
+     * Decodes a component according to a format.
      *
-     * @param {string} component uma sequência de componentes codificada
-     * @param {Format} format um formato
-     * @return {string} uma sequência de componentes decodificada
+     * @param {string} component An encoded component string.
+     * @param {Format} format A format.
+     * @return {string} An decoded component string.
      * @private
      */
     var _decodeComponent = function (component, format) {
@@ -489,16 +537,15 @@ Spot.LibURI = (function () {
     };
 
     /**
-     * retorna os componentes de um uri como um array
+     * Returns the components of a URI as an array.
      *
-     * @param {URI} uri um uri
-     * @param {Format} format o formato do output
-     * @return {Array.<string>} um array de componentes uri
+     * @param {URI} uri A uri.
+     * @param {Format} format The output format.
+     * @return {Array.<string>} An array of uri components.
      * @private
      */
     var _getComponents = function (uri, format) {
         var base62;
-
         if (uri.id) {
             base62 = uri._base62Id;
         }
@@ -506,7 +553,6 @@ Spot.LibURI = (function () {
         var components;
         var i;
         var len;
-
         switch (uri.type) {
             case URI.Type.ALBUM:
                 components = [URI.Type.ALBUM, base62];
@@ -541,12 +587,10 @@ Spot.LibURI = (function () {
                     trackIds.push(uri.tracks[i]._base62Id);
                 }
                 trackIds = [trackIds.join(',')];
-
-                // o index pode ser 0 às vezes (obrigatório para trackset)
+                // Index can be 0 sometimes (required for trackset)
                 if (uri.index !== null) {
                     trackIds.push('#', uri.index);
                 }
-
                 return [URI.Type.TRACKSET, _encodeComponent(uri.name)].concat(trackIds);
             case URI.Type.FACEBOOK:
                 return [URI.Type.USER, URI.Type.FACEBOOK, uri.uid];
@@ -673,11 +717,12 @@ Spot.LibURI = (function () {
     };
 
     /**
-     * analisa os componentes de um uri em um objeto uri real
+     * Parses the components of a URI into a real URI object.
      *
-     * @param {Array.<string>} components os componentes do uri como um array de strings
-     * @param {Format} format o formato da string de origem
-     * @return {URI} o objeto uri
+     * @param {Array.<string>} components The components of the URI as a string
+     *     array.
+     * @param {Format} format The format of the source string.
+     * @return {URI} The URI object.
      * @private
      */
     var _parseFromComponents = function (components, format, query) {
@@ -694,7 +739,6 @@ Spot.LibURI = (function () {
             if (component.length > 22) {
                 throw new Error('Invalid ID');
             }
-
             return component;
         };
 
@@ -715,10 +759,8 @@ Spot.LibURI = (function () {
         switch (part) {
             case URI.Type.ALBUM:
                 return URI.albumURI(_getIdComponent(), parseInt(_getNextComponent(), 10));
-
             case URI.Type.AD:
                 return URI.adURI(_getNextComponent());
-
             case URI.Type.ARTIST:
                 id = _getIdComponent();
                 if (_getNextComponent() == URI.Type.TOP) {
@@ -726,52 +768,38 @@ Spot.LibURI = (function () {
                 } else {
                     return URI.artistURI(id);
                 }
-
             case URI.Type.AUDIO_FILE:
                 return URI.audioFileURI(_getNextComponent(), _getNextComponent());
-
             case URI.Type.DAILY_MIX:
                 return URI.dailyMixURI(_getIdComponent());
-
             case URI.Type.TEMP_PLAYLIST:
                 return URI.temporaryPlaylistURI(_getNextComponent(), _getRemainingString());
-
             case URI.Type.PLAYLIST:
                 return URI.playlistV2URI(_getIdComponent());
-
             case URI.Type.SEARCH:
                 return URI.searchURI(_decodeComponent(_getRemainingString(), format));
-
             case URI.Type.TRACK:
                 return URI.trackURI(_getIdComponent(), _getNextComponent(), query.context, query.play);
-
             case URI.Type.TRACKSET:
                 var name = _decodeComponent(_getNextComponent());
                 var tracksArray = _getNextComponent();
                 var hashSign = _getNextComponent();
                 var index = parseInt(_getNextComponent(), 10);
-
-                // verificação de integridade: %23 é o código url para "#"
+                // Sanity check: %23 is URL code for "#"
                 if (hashSign !== '%23' || isNaN(index)) {
                     index = null;
                 }
-
                 var tracksetTracks = [];
-
                 if (tracksArray) {
                     tracksArray = _decodeComponent(tracksArray).split(',');
-
                     for (i = 0, len = tracksArray.length; i < len; i++) {
                         var trackId = tracksArray[i];
                         tracksetTracks.push(URI.trackURI(trackId));
                     }
                 }
-
                 return URI.tracksetURI(tracksetTracks, name, index);
-
             case URI.Type.CONTEXT_GROUP:
                 return URI.contextGroupURI(_getNextComponent(), _getNextComponent());
-
             case URI.Type.TOP:
                 var type = _getNextComponent();
                 if (_getNextComponent() == URI.Type.GLOBAL) {
@@ -779,11 +807,9 @@ Spot.LibURI = (function () {
                 } else {
                     return URI.toplistURI(type, _getNextComponent(), false);
                 }
-
             case URI.Type.USER:
                 var username = _decodeComponent(_getNextComponent(), format);
                 var text = _getNextComponent();
-
                 if (username == URI.Type.FACEBOOK && text != null) {
                     return URI.facebookURI(parseInt(text, 10));
                 } else if (text != null) {
@@ -929,13 +955,6 @@ Spot.LibURI = (function () {
         configurable: true
     });
 
-    /**
-     * Creates an application URI object from the current URI object.
-     *
-     * If the current URI object is already an application type, a copy is made.
-     *
-     * @return {URI} The current URI as an application URI.
-     */
     URI.prototype.toAppType = function () {
         if (this.type == URI.Type.APPLICATION) {
             return URI.applicationURI(this.id, this.args);
@@ -955,14 +974,6 @@ Spot.LibURI = (function () {
             return result;
         }
     };
-
-    /**
-     * Creates a URI object from an application URI object.
-     *
-     * If the current URI object is not an application type, a copy is made.
-     *
-     * @return {URI} The current URI as a real typed URI.
-     */
     URI.prototype.toRealType = function () {
         if (this.type == URI.Type.APPLICATION) {
             return _parseFromComponents([this.id].concat(this.args), Format.URI);
@@ -970,32 +981,12 @@ Spot.LibURI = (function () {
             return new URI(null, this);
         }
     };
-
-    /**
-     * Returns the URI representation of this URI.
-     *
-     * @return {String} The URI representation of this uri.
-     */
     URI.prototype.toURI = function () {
         return URI_PREFIX + _getComponents(this, Format.URI).join(':');
     };
-
-    /**
-     * Returns the String representation of this URI.
-     *
-     * @return {String} The URI representation of this uri.
-     * @see {URI#toURI}
-     */
     URI.prototype.toString = function () {
         return this.toURI();
     };
-
-    /**
-     * Get the URL path of this uri.
-     *
-     * @param {boolean} opt_leadingSlash True if a leading slash should be prepended.
-     * @return {String} The path of this uri.
-     */
     URI.prototype.toURLPath = function (opt_leadingSlash) {
         var components = _getComponents(this, Format.URL);
         if (components[0] === URI.Type.APP) {
@@ -1028,68 +1019,24 @@ Spot.LibURI = (function () {
         var path = components.join('/');
         return opt_leadingSlash ? '/' + path : path;
     };
-
-    /**
-     * Returns the Play URL string for the uri.
-     *
-     * @return {string} The Play URL string for the uri.
-     */
     URI.prototype.toPlayURL = function () {
         return PLAY_HTTPS_PREFIX + this.toURLPath();
     };
-
-    /**
-     * Returns the URL string for the uri.
-     *
-     * @return {string} The URL string for the uri.
-     * @see {URL#toPlayURL}
-     */
     URI.prototype.toURL = function () {
         return this.toPlayURL();
     };
-
-    /**
-     * Returns the Open URL string for the uri.
-     *
-     * @return {string} The Open URL string for the uri.
-     */
     URI.prototype.toOpenURL = function () {
         return OPEN_HTTPS_PREFIX + this.toURLPath();
     };
-
-    /**
-     * Returns the Play HTTPS URL string for the uri.
-     *
-     * @return {string} The Play HTTPS URL string for the uri.
-     */
     URI.prototype.toSecurePlayURL = function () {
         return this.toPlayURL();
     };
-
-    /**
-     * Returns the HTTPS URL string for the uri.
-     *
-     * @return {string} The HTTPS URL string for the uri.
-     * @see {URL#toSecurePlayURL}
-     */
     URI.prototype.toSecureURL = function () {
         return this.toPlayURL();
     };
-
-    /**
-     * Returns the Open HTTPS URL string for the uri.
-     *
-     * @return {string} The Open HTTPS URL string for the uri.
-     */
     URI.prototype.toSecureOpenURL = function () {
         return this.toOpenURL();
     };
-
-    /**
-     * Returns the id of the uri as a bytestring.
-     *
-     * @return {Array} The id of the uri as a bytestring.
-     */
     URI.prototype.idToByteString = function () {
         var hexId = Base62.toHex(this._base62Id);
         if (!hexId) {
@@ -1117,20 +1064,6 @@ Spot.LibURI = (function () {
     URI.prototype.getBase62Id = function () {
         return this._base62Id;
     }
-
-
-    /**
-    * Checks whether two URI:s refer to the same thing even though they might
-    * not necessarily be equal.
-    *
-    * These two Playlist URIs, for example, refer to the same playlist:
-    *
-    *   spotify:user:napstersean:playlist:3vxotOnOGDlZXyzJPLFnm2
-    *   spotify:playlist:3vxotOnOGDlZXyzJPLFnm2
-    *
-    * @param {*} uri The uri to compare identity for.
-    * @return {boolean} Whether they shared idenitity
-    */
     URI.prototype.isSameIdentity = function (uri) {
         var uriObject = URI.from(uri);
         if (!uriObject) return false;
@@ -1150,15 +1083,6 @@ Spot.LibURI = (function () {
             return false;
         }
     }
-
-    /**
-     * The various URI Types.
-     *
-     * Note that some of the types in this enum are not real URI types, but are
-     * actually URI particles. They are marked so.
-     *
-     * @enum {string}
-     */
     URI.Type = {
         EMPTY: 'empty',
         ALBUM: 'album',
@@ -1217,34 +1141,10 @@ Spot.LibURI = (function () {
         /** Deprecated contant. Please use USER_TOP_TRACKS. */
         USET_TOP_TRACKS: 'user-top-tracks'
     };
-
-    /**
-     * Creates a new URI object from a parsed string argument.
-     *
-     * @param {string} str The string that will be parsed into a URI object.
-     * @throws TypeError If the string argument is not a valid URI, a TypeError will
-     *     be thrown.
-     * @return {URI} The parsed URI object.
-     */
     URI.fromString = function (str) {
         var splitted = _splitIntoComponents(str);
         return _parseFromComponents(splitted.components, splitted.format, splitted.query);
     };
-
-    /**
-     * Parses a given object into a URI instance.
-     *
-     * Unlike URI.fromString, this function could receive any kind of value. If
-     * the value is already a URI instance, it is simply returned.
-     * Otherwise the value will be stringified before parsing.
-     *
-     * This function also does not throw an error like URI.fromString, but
-     * instead simply returns null if it can't parse the value.
-     *
-     * @param {*} value The value to parse.
-     * @return {URI?} The corresponding URI instance, or null if the
-     *     passed value is not a valid value.
-     */
     URI.from = function (value) {
         try {
             if (value instanceof URI) {
@@ -1258,15 +1158,6 @@ Spot.LibURI = (function () {
             return null;
         }
     };
-
-    /**
-     * Creates a new URI from a bytestring.
-     *
-     * @param {URI.Type} type The type of the URI.
-     * @param {ByteString} idByteString The ID of the URI as a bytestring.
-     * @param {Object} opt_args Optional arguments to the URI constructor.
-     * @return {URI} The URI object created.
-     */
     URI.fromByteString = function (type, idByteString, opt_args) {
         while (idByteString.length != 16) {
             idByteString = String.fromCharCode(0) + idByteString;
@@ -1281,162 +1172,54 @@ Spot.LibURI = (function () {
         args.id = id;
         return new URI(type, args);
     };
-
-    /**
-     * Clones a given SpotifyURI instance.
-     *
-     * @param {URI} uri The uri to clone.
-     * @return {URI?} An instance of URI.
-     */
     URI.clone = function (uri) {
         if (!(uri instanceof URI)) {
             return null;
         }
         return new URI(null, uri);
     };
-
-    /**
-     * @deprecated
-     */
-    URI.getCanonical = function (username) {
-        return this.getCanonical(username);
-    };
-
-    /**
-     * Returns the canonical representation of a username.
-     *
-     * @param {string} username The username to encode.
-     * @return {string} The encoded canonical representation of the username.
-     */
     URI.getCanonicalUsername = function (username) {
         return _encodeComponent(username, Format.URI);
     };
-
-    /**
-     * Returns the non-canonical representation of a username.
-     *
-     * @param {string} username The username to encode.
-     * @return {string} The unencoded canonical representation of the username.
-     */
     URI.getDisplayUsername = function (username) {
         return _decodeComponent(username, Format.URI);
     };
-
-    /**
-     * Returns the hex representation of a Base62 encoded id.
-     *
-     * @param {string} id The base62 encoded id.
-     * @return {string} The hex representation of the base62 id.
-     */
     URI.idToHex = function (id) {
         if (id.length == 22) {
             return Base62.toHex(id);
         }
         return id;
     };
-
-    /**
-     * Returns the base62 representation of a hex encoded id.
-     *
-     * @param {string} hex The hex encoded id.
-     * @return {string} The base62 representation of the id.
-     */
     URI.hexToId = function (hex) {
         if (hex.length == 32) {
             return Base62.fromHex(hex);
         }
         return hex;
     };
-
-    /**
-     * Creates a new empty URI.
-     *
-     * @return {URI} The empty URI.
-     */
     URI.emptyURI = function () {
         return new URI(URI.Type.EMPTY, {});
     };
-
-    /**
-     * Creates a new 'album' type URI.
-     *
-     * @param {string} id The id of the album.
-     * @param {number} disc The disc number of the album.
-     * @return {URI} The album URI.
-     */
     URI.albumURI = function (id, disc) {
         return new URI(URI.Type.ALBUM, { id: id, disc: disc });
     };
-
-    /**
-     * Creates a new 'ad' type URI.
-     *
-     * @param {string} id The id of the ad.
-     * @return {URI} The ad URI.
-     */
     URI.adURI = function (id) {
         return new URI(URI.Type.AD, { id: id });
     };
-
-    /**
-     * Creates a new 'audiofile' type URI.
-     *
-     * @param {string} extension The extension of the audiofile.
-     * @param {string} id The id of the extension.
-     * @return {URI} The audiofile URI.
-     */
     URI.audioFileURI = function (extension, id) {
         return new URI(URI.Type.AUDIO_FILE, { id: id, extension: extension });
     };
-
-    /**
-     * Creates a new 'artist' type URI.
-     *
-     * @param {string} id The id of the artist.
-     * @return {URI} The artist URI.
-     */
     URI.artistURI = function (id) {
         return new URI(URI.Type.ARTIST, { id: id });
     };
-
-    /**
-     * Creates a new 'artist-toplist' type URI.
-     *
-     * @param {string} id The id of the artist.
-     * @param {string} toplist The toplist type.
-     * @return {URI} The artist-toplist URI.
-     */
     URI.artistToplistURI = function (id, toplist) {
         return new URI(URI.Type.ARTIST_TOPLIST, { id: id, toplist: toplist });
     };
-
-    /**
-     * Creates a new 'dailymix' type URI.
-     *
-     * @param {Array.<string>} args An array of arguments for the dailymix.
-     * @return {URI} The dailymix URI.
-     */
     URI.dailyMixURI = function (id) {
         return new URI(URI.Type.DAILY_MIX, { id: id });
     };
-
-    /**
-     * Creates a new 'search' type URI.
-     *
-     * @param {string} query The unencoded search query.
-     * @return {URI} The search URI
-     */
     URI.searchURI = function (query) {
         return new URI(URI.Type.SEARCH, { query: query });
     };
-
-    /**
-     * Creates a new 'track' type URI.
-     *
-     * @param {string} id The id of the track.
-     * @param {string} anchor The point in the track formatted as mm:ss
-     * @return {URI} The track URI.
-     */
     URI.trackURI = function (id, anchor, context, play) {
         return new URI(URI.Type.TRACK, {
             id: id,
@@ -1445,15 +1228,6 @@ Spot.LibURI = (function () {
             play: play
         });
     };
-
-    /**
-     * Creates a new 'trackset' type URI.
-     *
-     * @param {Array.<URI>} tracks An array of 'track' type URIs.
-     * @param {string} name The name of the trackset.
-     * @param {number} index The index in the trackset.
-     * @return {URI} The trackset URI.
-     */
     URI.tracksetURI = function (tracks, name, index) {
         return new URI(URI.Type.TRACKSET, {
             tracks: tracks,
@@ -1461,184 +1235,54 @@ Spot.LibURI = (function () {
             index: isNaN(index) ? null : index
         });
     };
-
-    /**
-     * Creates a new 'facebook' type URI.
-     *
-     * @param {string} uid The user id.
-     * @return {URI} The facebook URI.
-     */
     URI.facebookURI = function (uid) {
         return new URI(URI.Type.FACEBOOK, { uid: uid });
     };
-
-    /**
-     * Creates a new 'followers' type URI.
-     *
-     * @param {string} username The non-canonical username.
-     * @return {URI} The followers URI.
-     */
     URI.followersURI = function (username) {
         return new URI(URI.Type.FOLLOWERS, { username: username });
     };
-
-    /**
-     * Creates a new 'following' type URI.
-     *
-     * @param {string} username The non-canonical username.
-     * @return {URI} The following URI.
-     */
     URI.followingURI = function (username) {
         return new URI(URI.Type.FOLLOWING, { username: username });
     };
-
-    /**
-     * Creates a new 'playlist' type URI.
-     *
-     * @param {string} username The non-canonical username of the playlist owner.
-     * @param {string} id The id of the playlist.
-     * @return {URI} The playlist URI.
-     */
     URI.playlistURI = function (username, id) {
         return new URI(URI.Type.PLAYLIST, { username: username, id: id });
     };
-
-    /**
-     * Creates a new 'playlist-v2' type URI.
-     *
-     * @param {string} id The id of the playlist.
-     * @return {URI} The playlist URI.
-     */
     URI.playlistV2URI = function (id) {
         return new URI(URI.Type.PLAYLIST_V2, { id: id });
     };
-
-    /**
-     * Creates a new 'folder' type URI.
-     *
-     * @param {string} username The non-canonical username of the folder owner.
-     * @param {string} id The id of the folder.
-     * @return {URI} The folder URI.
-     */
     URI.folderURI = function (username, id) {
         return new URI(URI.Type.FOLDER, { username: username, id: id });
     };
-
-    /**
-     * Creates a new 'collectiontracklist' type URI.
-     *
-     * @param {string} username The non-canonical username of the collection owner.
-     * @param {string} id The id of the tracklist.
-     * @return {URI} The collectiontracklist URI.
-     */
     URI.collectionTrackList = function (username, id) {
         return new URI(URI.Type.COLLECTION_TRACK_LIST, { username: username, id: id });
     };
-
-    /**
-     * Creates a new 'starred' type URI.
-     *
-     * @param {string} username The non-canonical username of the starred list owner.
-     * @return {URI} The starred URI.
-     */
     URI.starredURI = function (username) {
         return new URI(URI.Type.STARRED, { username: username });
     };
-
-    /**
-     * Creates a new 'user-toplist' type URI.
-     *
-     * @param {string} username The non-canonical username of the toplist owner.
-     * @param {string} toplist The toplist type.
-     * @return {URI} The user-toplist URI.
-     */
     URI.userToplistURI = function (username, toplist) {
         return new URI(URI.Type.USER_TOPLIST, { username: username, toplist: toplist });
     };
-
-    /**
-     * Creates a new 'user-top-tracks' type URI.
-     *
-     * @deprecated
-     * @param {string} username The non-canonical username of the toplist owner.
-     * @return {URI} The user-top-tracks URI.
-     */
     URI.userTopTracksURI = function (username) {
         return new URI(URI.Type.USER_TOP_TRACKS, { username: username });
     };
-
-    /**
-     * Creates a new 'toplist' type URI.
-     *
-     * @param {string} toplist The toplist type.
-     * @param {string} country The country code for the toplist.
-     * @param {boolean} global True if this is a global rather than a country list.
-     * @return {URI} The toplist URI.
-     */
     URI.toplistURI = function (toplist, country, global) {
         return new URI(URI.Type.TOPLIST, { toplist: toplist, country: country, global: !!global });
     };
-
-    /**
-     * Creates a new 'inbox' type URI.
-     *
-     * @param {string} username The non-canonical username of the inbox owner.
-     * @return {URI} The inbox URI.
-     */
     URI.inboxURI = function (username) {
         return new URI(URI.Type.INBOX, { username: username });
     };
-
-    /**
-     * Creates a new 'rootlist' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @return {URI} The rootlist URI.
-     */
     URI.rootlistURI = function (username) {
         return new URI(URI.Type.ROOTLIST, { username: username });
     };
-
-    /**
-     * Creates a new 'published-rootlist' type URI.
-     *
-     * @param {string} username The non-canonical username of the published-rootlist owner.
-     * @return {URI} The published-rootlist URI.
-     */
     URI.publishedRootlistURI = function (username) {
         return new URI(URI.Type.PUBLISHED_ROOTLIST, { username: username });
     };
-
-    /**
-     * Creates a new 'local-artist' type URI.
-     *
-     * @param {string} artist The artist name.
-     * @return {URI} The local-artist URI.
-     */
     URI.localArtistURI = function (artist) {
         return new URI(URI.Type.LOCAL_ARTIST, { artist: artist });
     };
-
-    /**
-     * Creates a new 'local-album' type URI.
-     *
-     * @param {string} artist The artist name.
-     * @param {string} album The album name.
-     * @return {URI} The local-album URI.
-     */
     URI.localAlbumURI = function (artist, album) {
         return new URI(URI.Type.LOCAL_ALBUM, { artist: artist, album: album });
     };
-
-    /**
-     * Creates a new 'local' type URI.
-     *
-     * @param {string} artist The artist name.
-     * @param {string} album The album name.
-     * @param {string} track The track name.
-     * @param {number} duration The track duration in ms.
-     * @return {URI} The local URI.
-     */
     URI.localURI = function (artist, album, track, duration) {
         return new URI(URI.Type.LOCAL, {
             artist: artist,
@@ -1647,169 +1291,52 @@ Spot.LibURI = (function () {
             duration: duration
         });
     };
-
-    /**
-     * Creates a new 'library' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {string} category The category of the library.
-     * @return {URI} The library URI.
-     */
     URI.libraryURI = function (username, category) {
         return new URI(URI.Type.LIBRARY, { username: username, category: category });
     };
-
-    /**
-     * Creates a new 'collection' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {string} category The category of the collection.
-     * @return {URI} The collection URI.
-     */
     URI.collectionURI = function (username, category) {
         return new URI(URI.Type.COLLECTION, { username: username, category: category });
     };
-
-    /**
-     * Creates a new 'temp-playlist' type URI.
-     *
-     * @param {string} origin The origin of the temporary playlist.
-     * @param {string} data Additional data for the playlist.
-     * @return {URI} The temp-playlist URI.
-     */
     URI.temporaryPlaylistURI = function (origin, data) {
         return new URI(URI.Type.TEMP_PLAYLIST, { origin: origin, data: data });
     };
-
-    /**
-     * Creates a new 'context-group' type URI.
-     *
-     * @deprecated
-     * @param {string} origin The origin of the temporary playlist.
-     * @param {string} name The name of the context group.
-     * @return {URI} The context-group URI.
-     */
     URI.contextGroupURI = function (origin, name) {
         return new URI(URI.Type.CONTEXT_GROUP, { origin: origin, name: name });
     };
-
-    /**
-     * Creates a new 'profile' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {Array.<string>} args A list of arguments.
-     * @return {URI} The profile URI.
-     */
     URI.profileURI = function (username, args) {
         return new URI(URI.Type.PROFILE, { username: username, args: args });
     };
-
-    /**
-     * Creates a new 'image' type URI.
-     *
-     * @param {string} id The id of the image.
-     * @return {URI} The image URI.
-     */
     URI.imageURI = function (id) {
         return new URI(URI.Type.IMAGE, { id: id });
     };
-
-    /**
-     * Creates a new 'mosaic' type URI.
-     *
-     * @param {Array.<string>} ids The ids of the mosaic immages.
-     * @return {URI} The mosaic URI.
-     */
     URI.mosaicURI = function (ids) {
         return new URI(URI.Type.MOSAIC, { ids: ids });
     };
-
-    /**
-     * Creates a new 'radio' type URI.
-     *
-     * @param {string} args The radio seed arguments.
-     * @return {URI} The radio URI.
-     */
     URI.radioURI = function (args) {
         args = typeof args === 'undefined' ? '' : args;
         return new URI(URI.Type.RADIO, { args: args });
     };
-
-    /**
-     * Creates a new 'special' type URI.
-     *
-     * @param {Array.<string>} args An array containing the other arguments.
-     * @return {URI} The special URI.
-     */
     URI.specialURI = function (args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.SPECIAL, { args: args });
     };
-
-    /**
-     * cria um novo uri do tipo 'station'
-     *
-     * @param {Array.<string>} args um array de argumentos para a estação
-     * @return {URI} o uri da estação
-     */
     URI.stationURI = function (args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.STATION, { args: args });
     };
-
-    /**
-     * cria um novo uri do tipo 'application'
-     *
-     * @param {string} id o id do aplicativo
-     * @param {Array.<string>} args um array que contém os argumentos para o aplicativo
-     * @return {URI} o uri do aplicativo
-     */
     URI.applicationURI = function (id, args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.APPLICATION, { id: id, args: args });
     };
-
-    /**
-     * Creates a new 'collection-album' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {string} id The id of the album.
-     * @return {URI} The collection-album URI.
-     */
     URI.collectionAlbumURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_ALBUM, { username: username, id: id });
     };
-
-    /**
-     * Creates a new 'collection-album-missing' type URI.
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {string} id The id of the album.
-     * @return {URI} The collection-album-missing URI.
-     */
     URI.collectionMissingAlbumURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_MISSING_ALBUM, { username: username, id: id });
     };
-
-    /**
-     * Cria um novo URI do tipo 'collection-artist'
-     *
-     * @param {string} username The non-canonical username of the rootlist owner.
-     * @param {string} id The id of the artist.
-     * @return {URI} The collection-artist URI.
-     */
     URI.collectionArtistURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_ARTIST, { username: username, id: id });
     };
-
-    /**
-     * cria um novo uri do tipo 'episode'
-     *
-     * @param {string} id o id do episódio
-     * @param {string} context um uri de contexto opcional
-     * @param {boolean} play alterna a reprodução automática no uri do episódio
-     * @return {URI} o uri do episódio
-     */
     URI.episodeURI = function (id, context, play) {
         return new URI(URI.Type.EPISODE, {
             id: id,
@@ -1817,23 +1344,9 @@ Spot.LibURI = (function () {
             play: play
         });
     };
-
-    /**
-     * cria um novo uri do tipo 'show'
-     *
-     * @param {string} id o id do show
-     * @return {URI} o uri do show
-     */
     URI.showURI = function (id) {
         return new URI(URI.Type.SHOW, { id: id });
     };
-
-    /**
-     * cria um novo uri do tipo 'concert'
-     *
-     * @param {string} id o id do concerto
-     * @return {URI} o uri do concerto
-     */
     URI.concertURI = function (id) {
         return new URI(URI.Type.CONCERT, { id: id });
     };
@@ -1863,65 +1376,87 @@ Spot.LibURI = (function () {
     URI.isStation = function (uri) { return (URI.from(uri) || {}).type === URI.Type.STATION; };
     URI.isTrack = function (uri) { return (URI.from(uri) || {}).type === URI.Type.TRACK; };
     URI.isProfile = function (uri) { return (URI.from(uri) || {}).type === URI.Type.PROFILE; };
-    URI.isPlaylistV1OrV2 = function (uri) { var uriObject = URI.from(uri); return !!uriObject && (uriObject.type === URI.Type.PLAYLIST || uriObject.type === URI.Type.PLAYLIST_V2);};
+    URI.isPlaylistV1OrV2 = function (uri) {
+        var uriObject = URI.from(uri);
+        return !!uriObject && (uriObject.type === URI.Type.PLAYLIST || uriObject.type === URI.Type.PLAYLIST_V2);
+    };
 
     /**
-     * exporta a interface pública
+     * Export public interface
      */
     return URI;
 })();
 
-Spot.getAudioData = (callback, uri) => {
-    uri = uri || Spot.Player.data.track.uri;
+Spot.getAudioData = (uri) => {
+    return new Promise((resolve, reject) => {
+        uri = uri || Spot.Player.data.track.uri;
+        const uriObj = Spot.LibURI.from(uri);
+        if (!uriObj && uriObj.Type !== Spot.LibURI.Type.TRACK) {
+            reject("URI is invalid.");
+            return;
+        }
 
-    if (typeof(callback) !== "function" ) {
-        console.log("Spot.getAudioData: o callback tem que ser uma função");
+        Spot.CosmosAPI.resolver.get(
+            `hm://audio-attributes/v1/audio-analysis/${uriObj.getBase62Id()}`,
+            (error, payload) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
 
-        return;
-    };
+                resolve(payload.getJSONBody());
+            })
+    });
+}
 
-    var id = Spot.LibURI.from(uri).id;
+Spot.getAblumArtColors = (uri) => {
+    return new Promise((resolve, reject) => {
+        uri = uri || Spot.Player.data.track.uri;
+        if (Spot.LibURI.isTrack(uri)) {
+            reject("URI is invalid.");
+            return;
+        }
 
-    if (id) {
-        window.cosmos.resolver.get(`hm://audio-attributes/v1/audio-analysis/${id}`, (error, payload) => {
-            if (error) {
-                console.log(error);
+        Spot.CosmosAPI.resolver.get(
+            `hm://colorextractor/v1/extract-presets?uri=${uri}&format=json`,
+            (error, payload) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
 
-                callback(null);
-
-                return;
+                const body = payload.getJSONBody();
+                if (body.entries && body.entries.length) {
+                    const list = {};
+                    for (const color of body.entries[0].color_swatches) {
+                        list[color.preset] = `#${color.color.toString(16).padStart(3, "0")}`;
+                    }
+                    resolve(list);
+                } else {
+                    resolve(null);
+                }
             }
-
-            if (payload._status === 200 && payload._body && payload._body !== "") {
-                var data = JSON.parse(payload._body);
-
-                data.uri=uri;
-
-                callback(data);
-            } else {
-                callback(null)
-            }
-        })
-    };
+        );
+    });
 }
 
 /**
- * define o cosmos, a ponte e a api ao vivo para objeto spot
+ * Set cosmos, bridge, live API to Spot object
  */
 (function findAPI() {
     if (!Spot.CosmosAPI) {
         Spot.CosmosAPI = window.cosmos;
     }
-
     if (!Spot.BridgeAPI) {
         Spot.BridgeAPI = window.bridge;
     }
-
     if (!Spot.LiveAPI) {
         Spot.LiveAPI = window.live;
     }
 
-    if (!Spot.CosmosAPI || !Spot.BridgeAPI || !Spot.LiveAPI) {
+    if (!Spot.CosmosAPI
+        || !Spot.BridgeAPI
+        || !Spot.LiveAPI) {
         setTimeout(findAPI, 1000)
     }
 })();
