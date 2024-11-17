@@ -55,15 +55,16 @@ func GetSpotifyPath() string {
 }
 
 func getSpotFolder() string {
-	home := "/"
+	result := "/"
 	
 	if runtime.GOOS == "windows" {
-		home = os.Getenv("USERPROFILE")
-	} else if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
-		home = os.Getenv("HOME")
+		result = filepath.Join(os.Getenv("USERPROFILE"), ".spot")
+	} else if runtime.GOOS == "linux" {
+		result = filepath.Join(os.Getenv("HOME"), ".spot")
+	} else if runtime.GOOS == "darwin" {
+		result = filepath.Join(os.Getenv("HOME"), "spot_data")
 	}
 
-	result := filepath.Join(home, ".spot")
 	utils.CheckExistAndCreate(result)
 
 	return result
