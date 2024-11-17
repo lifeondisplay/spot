@@ -279,45 +279,52 @@ func findSymbol(debugInfo, content string, clues []string) []string {
 func exposeAPIs(input string) string {
 	playerUI := findSymbol("playerUI", input, []string{
 		`([\w_]+)\.prototype\.updateProgressBarLabels`,
-		`([\w_]+)\.prototype\._onConnectionStateChange`})
+		`([\w_]+)\.prototype\._onConnectionStateChange`}
+	)
 
 	if playerUI != nil {
 		input = utils.Replace(
 			input,
 			playerUI[0]+`\.prototype\.setup=function\(\)\{`,
-			"${0}"+spotPlayerJS)
+			"${0}"+spotPlayerJS
+		)
 
 		// registra o evento de mudança de progresso
 		input = utils.Replace(
 			input,
 			playerUI[0]+`\.prototype\._onProgressBarProgress=function.+?\{`,
-			`${0}Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onprogress"));`)
+			`${0}Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onprogress"));`
+		)
 	}
 
 	// vazamento de metadados da faixa, estado do player e lista de reprodução atual para o spot.player.data
 	input = utils.Replace(
 		input,
 		`(const [\w_]+=([\w_]+)\.track\.metadata;)`,
-		`${1}Spot.Player.data=${2};`)
+		`${1}Spot.Player.data=${2};`
+	)
 
 	// encontra o símbolo event dispatcher (eventsymbol[0]) e event creator (eventsymbol[1])
 	eventSymbols := findSymbol("EventDispatcher and Event Creatir", input, []string{
 		`([\w_]+)\.default\.dispatchEvent\(new ([\w_]+)\.default\([\w_]+\.default\.NAVIGATION_OPEN_URI`,
-		`([\w_]+)\.default\.dispatchEvent\(new ([\w_]+)\.default\("show\-notification\-bubble"`})
+		`([\w_]+)\.default\.dispatchEvent\(new ([\w_]+)\.default\("show\-notification\-bubble"`}
+	)
 
 	showNotification := ""
 	if eventSymbols != nil {
 		showNotification = fmt.Sprintf(
 			`Spot.showNotification = (text) => {%s.default.dispatchEvent(new %s.default("show-notification-bubble", {i18n: text}))};`,
 			eventSymbols[0],
-			eventSymbols[1])
+			eventSymbols[1]
+		)
 	}
 
 	// vazamento de localstorage e shownotification
 	input = utils.Replace(
 		input,
 		`(const [\w_]+=([\w_]+)\.default\.get\([\w_]+\);)`,
-		`${1}Spot.LocalStorage=${2}.default;`+showNotification)
+		`${1}Spot.LocalStorage=${2}.default;`+showNotification
+	)
 
 	// encontra os símbolos player (playercosmossymbols[0]) e cosmos api (playercosmossymbols[1])
 	playerCosmosSymbols := findSymbol("player and cosmos in PlayerHelper", input, []string{
@@ -333,38 +340,52 @@ func exposeAPIs(input string) string {
 			fmt.Sprintf(
 				`;new %s(%s.resolver,"spotify:internal:queue","queue","1.0.0").subscribeToQueue((e,r)=>{if(e){console.log(e);return;}Spot.Queue=r.getJSONBody();});${1}`,
 				playerCosmosSymbols[0],
-				playerCosmosSymbols[1]))
+				playerCosmosSymbols[1]
+			)
+		)
 	}
 
 	// vazamento dos métodos addtoqueue e removefromqueue
 	input = utils.Replace(
 		input,
 		`(const [\w_]+=function\([\w_]+,[\w_]+\)\{)this\._bridge`,
-		"${1}"+spotQueueJS+"this._bridge")
+		"${1}"+spotQueueJS+"this._bridge"
+	)
 
 	// registra o evento de mudança de estado de reprodução/pausa
 	input = utils.Replace(
 		input,
 		`this\.playing\([\w_]+\.is_playing&&![\w_]+\.is_paused\).+?;`,
-		`${0}(this.playing()!==this._isPlaying)&&(this._isPlaying=this.playing(),Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onplaypause")));`)
+		`${0}(this.playing()!==this._isPlaying)&&(this._isPlaying=this.playing(),Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("onplaypause")));`
+	)
 
 	// registra evento de mudança de música
 	input = utils.Replace(
 		input,
 		`this\._uri=[\w_]+\.uri,this\._trackMetadata=[\w_]+\.metadata`,
-		`${0},Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("songchange"))`)
+		`${0},Spot.Player.dispatchEvent&&Spot.Player.dispatchEvent(new Event("songchange"))`
+	)
+
+	// registra o evento de mudança do app
+	input = utils.Replace(
+		input,
+		`(_onActivate\(\)\{)([\w_]+\.default\.dispatch\([\w_]+\.default\.activatePage)`,
+		`${1}const appChangeEvent=new Event("appchange");appChangeEvent.data=this._state._uri;Spicetify.Player.dispatchEvent(appChangeEvent);${2}`
+	)
 
 	// vazamento de playbackcontrol para spot.playbackcontrol
 	input = utils.Replace(
 		input,
 		`,(([\w_]+)\.playFromPlaylistResolver=)`,
-		`;Spot.PlaybackControl = ${2};${1}`)
+		`;Spot.PlaybackControl = ${2};${1}`
+	)
 
 	// desativa a restrição de função de exposição
 	input = utils.Replace(
 		input,
 		`(expose=function.+?)[\w_]+\.__spotify&&[\w_]+\.__spotify\.developer_mode&&`,
-		"${1}")
+		"${1}"
+	)
 
 	return input
 }
@@ -401,32 +422,42 @@ Spot.Player.thumbDown=()=>this.thumbDown();
 Spot.Player.getThumbDown=()=>this.trackThumbedDown();
 Spot.Player.formatTime=(ms)=>this._formatTime(ms);
 Spot.Player.eventListeners={};
+
 Spot.Player.addEventListener= (type, callback) => {
 	if (!(type in Spot.Player.eventListeners)) {
 		Spot.Player.eventListeners[type] = [];
 	}
 	Spot.Player.eventListeners[type].push(callback)
 };
+
 Spot.Player.removeEventListener = (type, callback) => {
     if (!(type in Spot.Player.eventListeners)) {
         return;
     }
+
     var stack = Spot.Player.eventListeners[type];
-    for (var i = 0, l = stack.length; i < l; i += 1) {
+
+    for (let i = 0; i < stack.length; i++) {
         if (stack[i] === callback) {
             stack.splice(i, 1);
             return;
         }
     }
 };
+
 Spot.Player.dispatchEvent = (event) => {
     if (!(event.type in Spot.Player.eventListeners)) {
         return true;
     }
+
     var stack = Spot.Player.eventListeners[event.type];
-    for (var i = 0, l = stack.length; i < l; i += 1) {
-        stack[i](event);
+
+    for (let i = 0; i < stack.length; i++) {
+		if (typeof stack[i] === "function") {
+			stack[i](event);
+		}
     }
+
     return !event.defaultPrevented;
 };
 `
@@ -434,10 +465,12 @@ Spot.Player.dispatchEvent = (event) => {
 const spotQueueJS = `
 Spot.addToQueue = (uri,callback) => {
 	uri = Spot.LibURI.from(uri);
+
 	if (uri.type === Spot.LibURI.Type.ALBUM) {
 		this.getAlbumTracks(uri, (err,tracks) => {
 			if (err) {
 				console.log("Spot.addToQueue", err);
+
 				return;
 			}
 
@@ -447,6 +480,7 @@ Spot.addToQueue = (uri,callback) => {
 		this.queueTracks([uri], callback);
 	} else {
 		console.log("Spot.addToQueue: Only Track, Album, Episode URIs are accepted");
+		
 		return;
 	}
 };
@@ -454,13 +488,17 @@ Spot.addToQueue = (uri,callback) => {
 Spot.removeFromQueue = (uri, callback) => {
     if (Spot.Queue) {
         let indices = [];
+
         const uriObj = Spot.LibURI.from(uri);
+
         if (uriObj.type === Spot.LibURI.Type.ALBUM) {
             this.getAlbumTracks(uriObj, (err, tracks) => {
                 if (err) {
                     console.log(err);
+
                     return;
                 }
+
                 tracks.forEach((trackUri) => {
 					Spot.Queue.next_tracks.forEach((nt, index) => {
 						trackUri == nt.uri && indices.push(index);
