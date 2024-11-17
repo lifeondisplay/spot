@@ -328,7 +328,7 @@ func RunCopy(from, to string, recursive bool, filters []string) error {
 		}
 
 		cmd = exec.Command(roboCopy, paraList...)
-	} else if runtime.GOOS == "linux" {
+	} else if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		var optionList = []string{"--recursive"}
 
 		if filters != nil && len(filters) > 0 {
@@ -342,7 +342,6 @@ func RunCopy(from, to string, recursive bool, filters []string) error {
 		optionList = append(optionList, from+"/", to)
 
 		cmd = exec.Command("rsync", optionList...)
-	} else if runtime.GOOS == "darwin" {
 	} else {
 		return errors.New("sistema operacional não suportado")
 	}

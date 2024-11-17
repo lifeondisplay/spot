@@ -46,12 +46,13 @@ func getDefaultConfig() *ini.File {
 	}
 
 	var defaultSpotifyPath string
+	
 	if runtime.GOOS == "windows" {
 		defaultSpotifyPath = filepath.Join(os.Getenv("APPDATA"), "Spotify")
 	} else if runtime.GOOS == "linux" {
 		defaultSpotifyPath = filepath.Join("/usr", "share", "spotify")
 	} else if runtime.GOOS == "darwin" {
-		defaultSpotifyPath = filepath.Join(os.Getenv("HOME"), "Library", "Application", "Spotify")
+		defaultSpotifyPath = filepath.Join("/Applications", "Spotify.app", "Contents", "Resources")
 	} else {
 		log.Fatal(errors.New("Unsupported OS"))
 	}
