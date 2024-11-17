@@ -60,7 +60,7 @@ depois de alterar o tema de cor e o css, rode `apply` novamente
 #### arquivo de configuração
 
 está localizado em:
-**windows**: `%userprofile%\.spicetify\config.ini`
+**windows**: `%userprofile%\.spot\config.ini`
 **linux e macos**: `~/.spot/config.ini`
 
 #### temas
