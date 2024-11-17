@@ -100,5 +100,5 @@ func UpdateCSS() {
 
 	date := time.Now()
 
-	utils.PrintSuccess(fmt.Sprintf("user.css é atualizado em %d:%d:%d", date.Hour(), date.Minute(), date.Second()))
+	utils.PrintSuccess(fmt.Sprintf("user.css é atualizado em %02d:%02d:%02d", date.Hour(), date.Minute(), date.Second()))
 }
