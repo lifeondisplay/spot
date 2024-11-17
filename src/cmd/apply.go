@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"../apply"
 	"../status/backup"
@@ -96,7 +98,7 @@ func UpdateCSS() {
 		settingSection.Key("replace_colors").MustInt(0) == 1,
 	)
 
-	utils.PrintSuccess("user.css está atualizado!")
+	date := time.Now()
 
-	utils.RestartSpotify(spotifyPath)
+	utils.PrintSuccess(fmt.Sprintf("user.css é atualizado em %d:%d:%d", date.Hour(), date.Minute(), date.Second()))
 }
