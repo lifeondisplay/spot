@@ -25,11 +25,6 @@ func init() {
 
 	log.SetFlags(0)
 
-	if len(os.Args) < 2 {
-		help()
-		os.Exit(0)
-	}
-
 	quiet := false
 	for _, v := range os.Args {
 		if v == "-q" || v == "--quiet" {
@@ -40,6 +35,12 @@ func init() {
 	}
 
 	cmd.Init(quiet)
+
+	if len(os.Args) < 2 {
+		help()
+
+		os.Exit(0)
+	}
 
 	for k, v := range os.Args {
 		switch v {
@@ -116,7 +117,7 @@ func main() {
 func help() {
 	fmt.Println("spot v" + version)
 	fmt.Print(`USO
-spot <comando>
+spot [<flag>] <comando>
 
 DESCRIÇÃO
 personaliza a interface e a funcionalidade do cliente spotify
@@ -138,6 +139,8 @@ FLAGS
 -c, --config        retorna o caminho do arquivo de configuração e saia.
 -h, --help          gera este texto de ajuda e saia.
 -v, --version       retorna o número da versão e saia.
+
+para informação de configuração, rode "spot -h config".
 `)
 }
 
