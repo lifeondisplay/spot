@@ -74,7 +74,7 @@ func Backup() {
 
 	tracker.Finish()
 
-	utils.RunCopy(rawFolder, themedFolder, []string{"*.html", "*.js", "*.css"})
+	utils.Copy(rawFolder, themedFolder, true, []string{".html", ".js", ".css"})
 
 	tracker.Reset()
 
@@ -124,7 +124,7 @@ func Restore() {
 	appFolder := filepath.Join(spotifyPath, "Apps")
 
 	os.RemoveAll(appFolder)
-	utils.RunCopy(backupFolder, appFolder, []string{"*.spa"})
+	utils.Copy(backupFolder, appFolder, false, []string{".spa"})
 
 	utils.PrintSuccess("o spotify foi restaurado.")
 	utils.RestartSpotify(spotifyPath)
