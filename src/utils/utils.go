@@ -15,84 +15,8 @@ import (
 	"runtime"
 	"strings"
 
-	"gopkg.in/cheggaaa/pb.v2"
-
-	backupStatus "../status/backup"
-	spotifyStatus "../status/spotify"
-
 	"github.com/go-ini/ini"
-	"github.com/logrusorgru/aurora"
 )
-
-func GetSpotifyStatus(spotifyPath string) spotifyStatus.Enum {
-	appsFolder := filepath.Join(spotifyPath, "Apps")
-	fileList, err := ioutil.ReadDir(appsFolder)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	spaCount := 0
-	dirCount := 0
-
-	for _, file := range fileList {
-		if file.IsDir() {
-			dirCount++
-
-			continue
-		}
-
-		if strings.HasSuffix(file.Name(), ".spa") {
-			spaCount++
-		}
-	}
-
-	totalFiles := len(fileList)
-
-	if spaCount == totalFiles {
-		return spotifyStatus.STOCK
-	}
-
-	if dirCount == totalFiles {
-		return spotifyStatus.APPLIED
-	}
-
-	return spotifyStatus.INVALID
-}
-
-func GetBackupStatus(spotifyPath, backupPath, backupVersion string) backupStatus.Enum {
-	fileList, err := ioutil.ReadDir(backupPath)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if len(fileList) == 0 {
-		return backupStatus.EMPTY
-	}
-
-	spotifyVersion := GetSpotifyVersion(spotifyPath)
-
-	if backupVersion != spotifyVersion {
-		return backupStatus.OUTDATED
-	}
-
-	spaCount := 0
-
-	for _, file := range fileList {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".spa") {
-			spaCount++
-		}
-	}
-
-	if spaCount > 0 {
-		return backupStatus.BACKUPED
-	}
-
-	os.RemoveAll(backupPath)
-
-	return backupStatus.EMPTY
-}
 
 // readanswer imprime um formulário sim/não com string de `info` e
 // retorna o valor booleano com base na entrada do usuário (y ou n)
@@ -119,6 +43,7 @@ func ReadAnswer(info string, defaultAnswer bool) bool {
 	return ReadAnswer(info, defaultAnswer)
 }
 
+// checa a existência de uma pasta ou então faz essa pasta caso não exista
 func CheckExistAndCreate(dir string) {
 	_, err := os.Stat(dir)
 
@@ -127,6 +52,7 @@ func CheckExistAndCreate(dir string) {
 	}
 }
 
+// descompacta um zip
 func Unzip(src, dest string) error {
 	r, err := zip.OpenReader(src)
 
@@ -181,16 +107,16 @@ func Unzip(src, dest string) error {
 	return nil
 }
 
+// utiliza regexp para encontrar qualquer coincidência do `input` com `regexpterm`
+// e substitui por `replaceterm` e então retorna uma nova string
 func Replace(input string, regexpTerm string, replaceTerm string) string {
 	re := regexp.MustCompile(regexpTerm)
 
 	return re.ReplaceAllString(input, replaceTerm)
 }
 
-func GetBool(section *ini.Section, keyName string, defVal bool) bool {
-	return section.Key(keyName).MustInt(0) == 1
-}
-
+// abre um arquivo, altera o conteúdo desse arquivo executando o
+// callback `repl` e escreve esse novo conteúdo
 func ModifyFile(path string, repl func(string) string) {
 	raw, err := ioutil.ReadFile(path)
 
@@ -205,6 +131,8 @@ func ModifyFile(path string, repl func(string) string) {
 	ioutil.WriteFile(path, []byte(content), 0644)
 }
 
+// encontra o path do arquivo `prefs` baseado no sistema operacional e retorna
+// uma referência de `ini.file`
 func GetPrefsCfg(spotifyPath string) (*ini.File, string, error) {
 	var path string
 
@@ -227,6 +155,7 @@ func GetPrefsCfg(spotifyPath string) (*ini.File, string, error) {
 	return cfg, path, nil
 }
 
+// getspotifyversion
 func GetSpotifyVersion(spotifyPath string) string {
 	pref, _, err := GetPrefsCfg(spotifyPath)
 	if err != nil {
@@ -243,25 +172,7 @@ func GetSpotifyVersion(spotifyPath string) string {
 	return version.MustString("")
 }
 
-func GetDevToolStatus(spotifyPath string) bool {
-	pref, _, err := GetPrefsCfg(spotifyPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	rootSection, err := pref.GetSection("")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	devTool, err := rootSection.GetKey("app.enable-developer-mode")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return devTool.MustBool(false)
-}
-
+// habilita/desabilita o modo de desenvolvedor no cliente do spotify
 func SetDevTool(spotifyPath string, enable bool) {
 	pref, prefFilePath, err := GetPrefsCfg(spotifyPath)
 	if err != nil {
@@ -285,43 +196,16 @@ func SetDevTool(spotifyPath string, enable bool) {
 	pref.SaveTo(prefFilePath)
 }
 
-func NewTracker(total int) *pb.ProgressBar {
-	return pb.ProgressBarTemplate(`{{counters . }} {{string . "appName" | green}}`).Start(total)
-}
-
-func PrintColor(color string, bold bool, text string) {
-	var value aurora.Value
-
-	switch color {
-		case "red":
-			value = aurora.Red(text)
-		case "green":
-			value = aurora.Green(text)
-		default:
-			return
-	}
-
-	if bold {
-		value = value.Bold()
-	}
-
-	log.Println(value)
-}
-
-func PrintBold(text string) {
-	log.Println(aurora.Bold(text))
-}
-
-func RunCopy(from, to string, recursive bool, filters []string) error {
+// copia todos os arquivos ou utiliza `filters` para copiar
+// certos arquivos que coincidem com as patterns
+func RunCopy(from, to string, filters []string) error {
 	var cmd *exec.Cmd
 	var paraList = []string{from, to}
 
 	if runtime.GOOS == "windows" {
 		roboCopy := filepath.Join(os.Getenv("windir"), "System32\\robocopy.exe")
 
-		if recursive {
-			paraList = append(paraList, "/E")
-		}
+		paraList = append(paraList, "/E")
 
 		if filters != nil && len(filters) > 0 {
 			paraList = append(paraList, filters...)
@@ -353,6 +237,7 @@ func RunCopy(from, to string, recursive bool, filters []string) error {
 	return nil
 }
 
+// retorna o diretório do processo atual
 func GetExecutableDir() string {
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 		exe, err := os.Executable()
@@ -369,6 +254,20 @@ func GetExecutableDir() string {
 	return ""
 }
 
+// retorna o diretório jshelper no diretório do executável
 func GetJsHelperDir() string {
 	return filepath.Join(GetExecutableDir(), "jsHelper")
+}
+
+// restartspotify
+func RestartSpotify(spotifyPath string) {
+	if runtime.GOOS == "windows" {
+		exec.Command("taskkill", "/F", "/IM", "spotify.exe").Run()
+		
+		exec.Command(filepath.Join(spotifyPath, "spotify.exe")).Start()
+	} else if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		exec.Command("pkill", "spotify").Run()
+
+		exec.Command(filepath.Join(spotifyPath, "spotify")).Start()
+	}
 }

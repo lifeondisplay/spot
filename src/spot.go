@@ -5,396 +5,201 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime"
 
-	"github.com/go-ini/ini"
-
-	"./backup"
-	"./color"
-	"./config"
-	"./preprocess"
-
-	backupStatus "./status/backup"
-	spotifyStatus "./status/spotify"
-
+	"./cmd"
 	"./utils"
-
 	"gopkg.in/mattn/go-colorable.v0"
 )
 
 const (
-	version = "0.1.0"
-)
-
-var (
-	spotFolder              = getSpotFolder()
-	cfgFilePath             = getConfigFilePath()
-	backupFolder            = getBackupFolder()
-	rawFolder, themedFolder = getExtractFolder()
+	version = "0.2.0"
 )
 
 func init() {
-	log.SetOutput(colorable.NewColorableStdout())
-	log.SetFlags(0)
-}
-
-func main() {
-	args := os.Args
-
-	var cfg = config.ParseConfig(cfgFilePath)
-
-	if len(args) < 2 {
-		help()
-		return
-	}
-
-	settingSec, err := cfg.GetSection("Setting")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	spotifyPath := settingSec.Key("spotify_path").MustString("")
-	if len(spotifyPath) == 0 {
-		utils.PrintColor("red", true, "por favor, configure o spotify_path em config.ini")
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		utils.PrintError("sistema operacional não suportado.")
 
 		os.Exit(1)
 	}
 
-	backupCfgSection, err := cfg.GetSection("Backup")
-	backupVersion := backupCfgSection.Key("version").MustString("")
-	curBackupStatus := utils.GetBackupStatus(spotifyPath, backupFolder, backupVersion)
+	log.SetFlags(0)
 
-	switch args[1] {
-		case "backup":
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if curBackupStatus != backupStatus.EMPTY {
-				utils.PrintColor("red", true, "há um backup disponível, mas limpe o backup atual primeiro!")
-
-				clearBackup(backupFolder, rawFolder, themedFolder)
-
-				backupCfgSection.Key("version").SetValue("")
-
-				cfg.SaveTo(cfgFilePath)
-			}
-
-			utils.PrintBold("fazendo backup dos arquivos dos aplicativos:")
-
-			if err = backup.Start(spotifyPath, backupFolder); err != nil {
-				log.Fatal(err)
-			}
-
-			utils.PrintColor("green", false, "✔")
-
-			appList, err := ioutil.ReadDir(backupFolder)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			utils.PrintBold("extraindo:")
-
-			tracker := utils.NewTracker(len(appList))
-			defer tracker.Finish()
-
-			backup.Extract(backupFolder, rawFolder, func(appName string, err error) {
-				tracker.Increment()
-				tracker.Set("appName", appName)
-			})
-
-			tracker.Set("appName", "✔")
-			tracker.Finish()
-
-			preprocSec, err := cfg.GetSection("pré-processos")
-
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			tracker = utils.NewTracker(len(appList))
-
-			utils.PrintBold("pré-processando:")
-
-			preprocess.Start(
-				rawFolder,
-
-				preprocess.Flag {
-					DisableSentry:  preprocSec.Key("disable_sentry").MustInt(0) == 1,
-					DisableLogging: preprocSec.Key("disable_ui_logging").MustInt(0) == 1,
-					RemoveRTL:      preprocSec.Key("remove_rtl_rule").MustInt(0) == 1,
-					ExposeAPIs:     preprocSec.Key("expose_apis").MustInt(0) == 1
-				},
-
-				func(appName string, err error) {
-					tracker.Increment()
-					tracker.Set("appName", appName)
-				}
-			)
-
-			tracker.Set("appName", "✔")
-			tracker.Finish()
-
-			utils.RunCopy(rawFolder, themedFolder, true, []string{"*.html", "*.js", "*.css"})
-
-			tracker = utils.NewTracker(len(appList))
-
-			preprocess.StartCSS(themedFolder, func(appName string, err error) {
-				tracker.Increment()
-				tracker.Set("appName", appName)
-			})
-
-			tracker.Set("appName", "✔")
-			tracker.Finish()
-
-			backupCfgSection.Key("version").SetValue(utils.GetSpotifyVersion(spotifyPath))
-			cfg.SaveTo(cfgFilePath)
-			utils.PrintColor("green", true, "está tudo pronto, você pode começar as aplicações agora!")
-
-		case "clear":
-			clearBackup(backupFolder, rawFolder, themedFolder)
-			backupCfgSection.Key("version").SetValue("")
-			cfg.SaveTo(cfgFilePath)
-
-		case "apply":
-			appFolder := filepath.Join(spotifyPath, "Apps")
-
-			curSpotifyStatus := utils.GetSpotifyStatus(spotifyPath)
-			if curSpotifyStatus == spotifyStatus.STOCK {
-				os.RemoveAll(appFolder)
-				utils.RunCopy(rawFolder, appFolder, true, []string{})
-			}
-
-			replaceColors := settingSec.Key("replace_colors").MustInt(0) == 1
-			if replaceColors {
-				utils.RunCopy(themedFolder, appFolder, true, []string{})
-			} else {
-				utils.RunCopy(rawFolder, appFolder, true, []string{})
-			}
-
-			themeName, err := settingSec.GetKey("current_theme")
-
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			themeFolder, err := getThemeFolder(themeName.MustString("SpotDefault"))
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			var userCSS string
-
-			if replaceColors {
-				userCSS += getColorCSS(themeFolder)
-			} else {
-				userCSS += getColorCSS("")
-			}
-
-			if settingSec.Key("inject_css").MustInt(0) == 1 {
-				userCSS += getUserCSS(themeFolder)
-			}
-
-			userCSSDestPath := filepath.Join(appFolder, "zlink", "css", "user.css")
-			ioutil.WriteFile(userCSSDestPath, []byte(userCSS), 0644)
-			userCSSDestPath = filepath.Join(appFolder, "login", "css", "user.css")
-			ioutil.WriteFile(userCSSDestPath, []byte(userCSS), 0644)
-
-		case "restore":
-			appFolder := filepath.Join(spotifyPath, "Apps")
-			status := utils.GetSpotifyStatus(spotifyPath)
-			if status == spotifyStatus.APPLIED {
-				os.RemoveAll(appFolder)
-
-				utils.RunCopy(backupFolder, appFolder, false, []string{"*.spa"})
-			}
-
-		case "enable-devtool":
-			utils.SetDevTool(spotifyPath, true)
-			utils.PrintBold("o devtool foi ativado! reinicie seu cliente spotify.")
-
-		case "disable-devtool":
-			utils.SetDevTool(spotifyPath, false)
-			utils.PrintBold("o devtool foi desativado! reinicie seu cliente spotify.")
-
-		case "-c", "--config":
-			log.Print(getConfigFilePath())
-
-		case "-h", "--help":
-			help()
-
-		case "-v", "--version":
-			fmt.Print(version)
+	if len(os.Args) < 2 {
+		help()
+		os.Exit(0)
 	}
 
-	return
+	quiet := false
+	for _, v := range os.Args {
+		if v == "-q" || v == "--quiet" {
+			quiet = true
+
+			break
+		}
+	}
+
+	cmd.Init(quiet)
+
+	for k, v := range os.Args {
+		switch v {
+			case "-c", "--config":
+				log.Print(cmd.GetConfigPath())
+
+				os.Exit(0)
+
+			case "-h", "--help":
+				if len(os.Args) > k+1 && os.Args[k+1] == "config" {
+					helpConfig()
+				} else {
+					help()
+				}
+
+				os.Exit(0)
+
+			case "-v", "--version":
+				log.Print(version)
+
+				os.Exit(0)
+		}
+	}
+
+	if quiet {
+		log.SetOutput(ioutil.Discard)
+	} else {
+		// suporta a saída do output em cores para sistemas windows
+		log.SetOutput(colorable.NewColorableStdout())
+	}
+}
+
+func main() {
+	utils.PrintBold("spot v" + version)
+	args := os.Args[1:]
+
+	for _, argv := range args {
+		switch argv {
+			case "backup":
+				cmd.Backup()
+
+			case "clear":
+				cmd.ClearBackup()
+
+			case "apply":
+				cmd.Apply()
+
+			case "update":
+				cmd.UpdateCSS()
+
+			case "restore":
+				cmd.Restore()
+
+			case "enable-devtool":
+				cmd.SetDevTool(true)
+
+			case "disable-devtool":
+				cmd.SetDevTool(false)
+
+			default:
+				if argv[0] != '-' {
+					utils.PrintError(`comando "` + argv + `" não encontrado.`)
+					utils.PrintInfo(`rode "spot -h" para uma lista dos comandos válidos.`)
+
+					os.Exit(1)
+				}
+		}
+	}
 }
 
 func help() {
-	fmt.Print(`
-SYNOPSIS
-spot <command>
+	fmt.Println("spot v" + version)
+	fmt.Print(`USO
+spot <comando>
 
-DESCRIPTION
-Customize Spotify client UI and functionality
+DESCRIÇÃO
+personaliza a interface e a funcionalidade do cliente spotify
 
-COMMANDS
+COMANDOS
 backup              inicia o backup e o pré-processamento dos arquivos do aplicativo.
 apply               aplica a customização.
 restore             restaura o spotify ao estado original.
 clear               limpa os arquivos de backup atuais.
-enable-devtool      habilita as ferramentas para desenvolvedores (console, inspect, ...) do
-					cliente spotify, clique ctrl + shift + i no cliente para iniciar.
-disable-devtool     desabilita as ferramentas de desenvolvedor do cliente spotify.
--c, --config        retorna o path do arquivo de configuração
--h, --help          gera este texto de ajuda
--v, --version       retorna o número da versão e saia
+enable-devtool      ativa as ferramentas de desenvolvedor do spotify. (console, inspect, ...),
+                    pressione ctrl + shift + i no cliente para começar a usar.
+disable-devtool     desativa as ferramentas de desenvolvedor do spotify.
+
+FLAGS
+-q, --quiet         modo silencioso (sem output).
+-c, --config        retorna o caminho do arquivo de configuração e saia.
+-h, --help          gera este texto de ajuda e saia.
+-v, --version       retorna o número da versão e saia.
 `)
 }
 
-func getSpotFolder() string {
-	home := "/"
-	if runtime.GOOS == "windows" {
-		home = os.Getenv("USERPROFILE")
-	} else if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
-		home = os.Getenv("HOME")
-	}
+func helpConfig() {
+	fmt.Print(`SIGNIFICADO DA CONFIGURAÇÃO
+[Setting]
+spotify_path
+	path para o diretório spotify
 
-	result := filepath.Join(home, ".spot")
-	_, err := os.Stat(result)
-	if err != nil {
-		os.Mkdir(result, 0644)
-	}
+current_theme
+	nome da pasta do seu tema
 
-	return result
-}
+inject_css
+	se o css personalizado de user.css na pasta do tema é aplicado
 
-func getConfigFilePath() string {
-	return filepath.Join(spotFolder, "config.ini")
-}
+replace_colors
+    se as cores personalizadas são aplicadas
 
-func getBackupFolder() string {
-	dir := filepath.Join(spotFolder, "Backup")
-	utils.CheckExistAndCreate(dir)
+[Preprocesses]
+disable_sentry
+    impede que o sentry envie log/erro/aviso do console aos desenvolvedores do spotify.
+    ative se não quiser chamar a atenção deles ao desenvolver extensão ou aplicativo.
 
-	return dir
-}
+disable_ui_logging
+    vários elementos registram cada clique e rolagem do usuário.
+    ative para interromper o registro e melhorar a experiência do usuário.
 
-func getExtractFolder() (string, string) {
-	dir := filepath.Join(spotFolder, "Extracted")
-	utils.CheckExistAndCreate(dir)
+remove_rtl_rule
+    para oferecer suporte ao árabe e outros idiomas da direita para a esquerda, o
+	spotify adicionou muitas regras css que estão obsoletas para usuários da
+	esquerda para a direita.
+    ative para remover todos eles e melhorar a velocidade de renderização.
 
-	raw := filepath.Join(dir, "Raw")
-	utils.CheckExistAndCreate(raw)
+expose_apis
+    vaza algumas apis, funções e objetos do spotify para o objeto global
+	do spot que são úteis para fazer extensões para estender a
+	funcionalidade do spotify.
 
-	themed := filepath.Join(dir, "Themed")
-	utils.CheckExistAndCreate(themed)
+[AdditionalOptions]
+experimental_features
+    permite o acesso aos recursos experimentais do spotify. abra-o no
+	menu do perfil (canto superior direito).
 
-	return raw, themed
-}
+fastUser_switching
+    permite a alteração de conta imediatamente. abra-o no menu do perfil.
 
-func clearBackup(backupFolder, rawFolder, themedFolder string) {
-	if !utils.ReadAnswer("antes de limpar o backup, certifique-se de ter restaurado ou reinstalado o spotify ao estado original. continuar? [s/n]: ", false) {
-		os.Exit(1)
-	}
+home
+    habilita a página inicial. acesse-o na barra lateral esquerda.
 
-	os.RemoveAll(backupFolder)
-	os.RemoveAll(rawFolder)
-	os.RemoveAll(themedFolder)
-}
+lyric_always_show
+    força o botão de letras para mostrar o tempo todo na barra do player.
+    útil para quem deseja assistir a página de visualização.
 
-func getThemeFolder(themeName string) (string, error) {
-	folder := filepath.Join(spotFolder, "Themes", themeName)
-	_, err := os.Stat(folder)
-	if err == nil {
-		return folder, nil
-	}
+lyric_force_no_sync
+    força a exibição de todas as letras.
 
-	folder = filepath.Join(utils.GetExecutableDir(), "Themes", themeName)
-	_, err = os.Stat(folder)
-	if err == nil {
-		return folder, nil
-	}
+made_for_you_hub
+    ativa a página feito para você. acesse-o na barra lateral esquerda.
 
-	return "", err
-}
+radio
+    habilita a página de rádio. acesse-o na barra lateral esquerda.
 
-func getUserCSS(themeFolder string) string {
-	cssFilePath := filepath.Join(themeFolder, "user.css")
-	_, err := os.Stat(cssFilePath)
+song_page
+    clicar no nome da música na barra do player acessará a página da
+	música (em vez da página do álbum) para descobrir as listas de
+	reprodução nas quais ela aparece.
 
-	if err != nil {
-		return ""
-	}
-
-	content, err := ioutil.ReadFile(cssFilePath)
-	if err != nil {
-		return ""
-	}
-
-	return string(content)
-}
-
-// lista de nomes das cores e seus valores padrão
-var baseColorList = map[string]string{
-	"main_fg":                               "ffffff",
-	"secondary_fg":                          "c0c0c0",
-	"main_bg":                               "282828",
-	"sidebar_and_player_bg":                 "000000",
-	"cover_overlay_and_shadow":              "000000",
-	"indicator_fg_and_button_bg":            "1db954",
-	"pressing_fg":                           "cdcdcd",
-	"slider_bg":                             "404040",
-	"sidebar_indicator_and_hover_button_bg": "1ed660",
-	"scrollbar_fg_and_selected_row_bg":      "333333",
-	"pressing_button_fg":                    "cccccc",
-	"pressing_button_bg":                    "179443",
-	"selected_button":                       "18ac4d",
-	"miscellaneous_bg":                      "4687d6",
-	"miscellaneous_hover_bg":                "2e77d0",
-	"preserve_1":                            "ffffff"
-}
-
-func getColorCSS(themeFolder string) string {
-	var colorCfg *ini.File
-	var err error
-
-	if len(themeFolder) == 0 {
-		colorCfg = ini.Empty()
-	} else {
-		colorFilePath := filepath.Join(themeFolder, "color.ini")
-		if colorCfg, err = ini.Load(colorFilePath); err != nil {
-			colorCfg = ini.Empty()
-		}
-	}
-
-	base := colorCfg.Section("Base")
-
-	var variableList string
-
-	for k, v := range baseColorList {
-		parsed := color.Parse(base.Key(k).MustString(v))
-		variableList += fmt.Sprintf(`
-    --modspotify_%s: #%s;
-    --modspotify_rgb_%s: %s;`,
-			k, parsed.Hex,
-			k, parsed.RGB)
-	}
-
-	more, err := colorCfg.GetSection("More")
-
-	if err == nil {
-		for _, v := range more.KeyStrings() {
-			parsed := color.Parse(more.Key(v).MustString("ffffff"))
-			variableList += fmt.Sprintf(`
-    --modspotify_more_%s: #%s;
-    --modspotify_more_rgb_%s: %s;`,
-				v, parsed.Hex,
-				v, parsed.RGB)
-		}
-	}
-
-	return fmt.Sprintf(":root {%s\n}\n", variableList)
+visualization_high_framerate
+    força a visualização no aplicativo de letras para renderizar em 60fps.
+`)
 }

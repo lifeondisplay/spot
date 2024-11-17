@@ -13,17 +13,20 @@ import (
 
 // a flag habilita/desabilita os pré-processos a serem aplicados
 type Flag struct {
-	DisableSentry  bool
+	// disablesentry: impede que o sentry envie log/erro/aviso do console para desenvolvedores do spotify
+	DisableSentry bool
+
+	// disablelogging: interrompe vários elementos para registrar a interação do usuário
 	DisableLogging bool
-	RemoveRTL      bool
-	ExposeAPIs     bool
+
+	// removertl: remove todas as regras css da direita para a esquerda para simplificar os arquivos css
+	RemoveRTL bool
+
+	// exposeapis: vaza algumas das apis, funções, objetos do spotify para o objeto global spot
+	ExposeAPIs bool
 }
 
 // inicia o pré-processamento ativo de aplicativos em extractapppath
-//
-// disablesentry: impede que o sentry envie log/erro/aviso do console para desenvolvedores do spotify
-// disablelogging: interrompe vários elementos para registrar a interação do usuário
-// removertl: remove todas as regras css da direita para a esquerda para simplificar os arquivos css
 func Start(extractedAppsPath string, flags Flag, callback func(appName string, err error)) {
 	appList, err := ioutil.ReadDir(extractedAppsPath)
 
@@ -88,7 +91,7 @@ func Start(extractedAppsPath string, flags Flag, callback func(appName string, e
 		})
 
 		if appName == "zlink" && flags.ExposeAPIs {
-			utils.RunCopy(utils.GetJsHelperDir(), appPath, false, []string{"spotWrapper.js"})
+			utils.RunCopy(utils.GetJsHelperDir(), appPath, []string{"spotWrapper.js"})
 		}
 
 		if err != nil {
@@ -268,7 +271,7 @@ func findSymbol(debugInfo, content string, clues []string) []string {
 		}
 	}
 
-	utils.PrintColor("red", false, "\nCannot find symbol for "+debugInfo)
+	utils.PrintError("não foi possível encontrar um símbolo para " + debugInfo)
 
 	return nil
 }
