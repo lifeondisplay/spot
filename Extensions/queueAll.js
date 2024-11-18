@@ -112,12 +112,12 @@
      * @returns {boolean}
      */
     function filterURI(uri) {
-        const uriObj = Spot.LibURI.from(uri);
+        const uriObj = Spot.URI.from(uri);
 
         if (
-            uriObj.type === Spot.LibURI.Type.ALBUM ||
-            uriObj.type === Spot.LibURI.Type.TRACK ||
-            uriObj.type === Spot.LibURI.Type.EPISODE
+            uriObj.type === Spot.URI.Type.ALBUM ||
+            uriObj.type === Spot.URI.Type.TRACK ||
+            uriObj.type === Spot.URI.Type.EPISODE
         ) {
             return true;
         }

@@ -33,30 +33,30 @@
 
         b.onclick = () => {
             const contextURI = Spot.Player.data.context_uri;
-            const uriObj = Spot.LibURI.fromString(contextURI);
+            const uriObj = Spot.URI.fromString(contextURI);
 
             switch (uriObj.type) {
-                case Spot.LibURI.Type.SHOW:
+                case Spot.URI.Type.SHOW:
                     showShuffle(uriObj.getBase62Id());
 
                     break;
 
-                case Spot.LibURI.Type.PLAYLIST:
+                case Spot.URI.Type.PLAYLIST:
                     playlistShuffle(contextURI);
 
                     break;
 
-                case Spot.LibURI.Type.FOLDER:
+                case Spot.URI.Type.FOLDER:
                     folderShuffle(contextURI);
 
                     break;
 
-                case Spot.LibURI.Type.ALBUM:
+                case Spot.URI.Type.ALBUM:
                     albumShuffle(contextURI);
 
                     break;
 
-                case Spot.LibURI.Type.COLLECTION:
+                case Spot.URI.Type.COLLECTION:
                     collectionShuffle();
 
                     break;

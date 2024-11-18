@@ -6,7 +6,7 @@
 /// <reference path="../globals.d.ts" />
 
 (function DJMode() {
-    if (!Spot.LocalStorage || !Spot.addToQueue || !Spot.LibURI) {
+    if (!Spot.LocalStorage || !Spot.addToQueue || !Spot.URI) {
         setTimeout(DJMode, 1000);
         
         return;
