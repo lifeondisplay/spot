@@ -26,88 +26,33 @@
         Spot.LocalStorage.set("DJMode", JSON.stringify(setting));
     }
 
-    const item = document.createElement("div");
-    item.innerText = "DJ Mode";
-    item.classList.add("MenuItem", "MenuItem--has-submenu");
+    const enableToggle = new Spot.Menu.Item(
+        "Enabled",
+        setting.enabled,
+        () => {
+            setting.enabled = !setting.enabled;
+            Spot.LocalStorage.set("DJMode", JSON.stringify(setting));
+            document.location.reload();
+        } 
+    );
 
-    const subMenu = document.createElement("div");
-    subMenu.classList.add("Menu", "Menu--is-submenu");
+    const hideToggle = new Spot.Menu.Item(
+        "Hide controls",
+        setting.enabled && setting.hideControls,
+        () => {
+            setting.hideControls = !setting.hideControls;
+            showHideControl(setting.hideControls);
 
-    const enableToggle = document.createElement("button");
-
-    enableToggle.innerText = "Enabled";
-    enableToggle.classList.add("MenuItem");
-
-    enableToggle.onclick = () => {
-        setting.enabled = !setting.enabled;
-
-        Spot.LocalStorage.set("DJMode", JSON.stringify(setting));
-
-        document.location.reload();
-    };
-
-    if (setting.enabled) {
-        enableToggle.classList.add(
-            "MenuItemToggle--checked",
-            "MenuItem--is-active"
-        );
-    }
-
-    const hideToggle = document.createElement("button");
-    hideToggle.innerText = "Hide controls";
-    hideToggle.classList.add("MenuItem");
-
-    hideToggle.onclick = () => {
-        setting.hideControls = !setting.hideControls;
-
-        showHideControl(setting.hideControls);
-
-        Spot.LocalStorage.set("DJMode", JSON.stringify(setting));
-
-        if (setting.hideControls) {
-            hideToggle.classList.add(
-                "MenuItemToggle--checked",
-                "MenuItem--is-active"
-            );
-        } else {
-            hideToggle.classList.remove(
-                "MenuItemToggle--checked",
-                "MenuItem--is-active"
-            );
+            hideToggle.setState(setting.hideControls);
+            Spot.LocalStorage.set("DJMode", JSON.stringify(setting));
         }
-    };
+    );
 
-    if (setting.enabled && setting.hideControls) {
-        hideToggle.classList.add(
-            "MenuItemToggle--checked",
-            "MenuItem--is-active"
-        );
-    }
+    new Spot.Menu.SubMenu("DJ Mode", [
+        enableToggle,
+        hideToggle
+    ]).register();
 
-    subMenu.appendChild(enableToggle);
-    subMenu.appendChild(hideToggle);
-    item.appendChild(subMenu);
-    item.onmouseenter = () => {
-        subMenu.classList.add("open");
-        item.classList.add("selected");
-    };
-
-    subMenu.onmouseleave = () => {
-        subMenu.classList.remove("open");
-        item.classList.remove("selected");
-    };
-
-    var menuEl = document.querySelector("#PopoverMenu-container");
-
-    // observando o menu do perfil
-    var menuObserver = new MutationObserver(() => {
-        const root = menuEl.querySelector(".Menu__root-items");
-        if (root) {
-            root.prepend(item);
-        }
-    });
-
-    menuObserver.observe(menuEl, { childList: true });
     if (!setting.enabled) {
         // não fazer nada quando o modo dj estiver desligado
         return;
@@ -185,12 +130,12 @@
      * @returns {boolean} se o uri de entrada é compatível
      */
     function isValidURI(uri) {
-        const uriType = Spot.LibURI.fromString(uri).type;
+        const uriType = Spot.URI.fromString(uri).type;
 
         if (
-            uriType === Spot.LibURI.Type.ALBUM ||
-            uriType === Spot.LibURI.Type.TRACK ||
-            uriType === Spot.LibURI.Type.EPISODE
+            uriType === Spot.URI.Type.ALBUM ||
+            uriType === Spot.URI.Type.TRACK ||
+            uriType === Spot.URI.Type.EPISODE
         ) {
             return true;
         }
@@ -199,26 +144,18 @@
     }
 
     /**
-     *
      * @param {string} uri
      */
-    function clickFunc(uri) {
-        return () =>
-            Spot.addToQueue(uri).then(() => {
-                Spot.BridgeAPI.request(
-                    "track_metadata", [uri], (_, track) => {
-                        Spot.showNotification(
-                            `${track.name} - ${
-                                track.artists[0].name
-                            } adicionado à lista de reprodução.`
-                        );
-                    }
+    const clickFunc = (uri) => () =>
+        Spot.addToQueue(uri).then(() => {
+            Spot.BridgeAPI.request("track_metadata", [uri], (_, track) => {
+                Spot.showNotification(
+                    `${track.name} - ${track.artists[0].name} adicionado à lista de reprodução.`
                 );
             });
-    }
+    });
 
     /**
-     *
      * @param {Document} doc
      */
     function applyIframe(doc) {
