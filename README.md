@@ -7,6 +7,7 @@ suporte para windows, macos e linux.
 
 - alterar as cores de toda a ui
 - injetar css para customização avançada
+- injeção de extensões (script javascript) para estender funcionalidades, manipular ui e controlar o player
 - habilitar algumas features adicionais, escondidas
 - remover componentes para melhorar a performance
 
@@ -82,11 +83,36 @@ há 2 espaços onde você pode inserir seus temas:
 
 1. a pasta `Themes` no diretório home
 **windows**: `%userprofile%\.spot\Themes\`
-**linux** `~/.spot/Themes/`  
+**linux:** `~/.spot/Themes/`  
 **macos:** `~/spot_data/Themes`    
 2. a pasta `Themes` no diretório do executável spot
 
 caso haja 2 temas contendo o mesmo nome, o tema no diretório home é o priorizado.
+
+#### extensões
+
+adicione os nomes da sua extensão desejada em config, separado pelo caractere `|`.
+
+exemplo:
+
+```ini
+[AdditionalOptions]
+...
+extensions
+autoSkipExplicit.js|queueAll.js|djMode.js|shuffle+.js|trashbin.js
+```
+
+arquivos de extensão podem ser armazenados em:
+
+- na pasta `Extensions` no diretório home:
+**windows:** `%userprofile%\.spot\Extensions\`
+**linux:** `~/.spot/Extensions/`
+**macos:** `~/spot_data/Extensions`
+- na pasta `Extensions` no diretório do executável do spot
+
+se houver 2 ramais com o mesmo nome, o ramal no diretório inicial será priorizado.
+
+algumas apis do spotify vazaram e foram colocadas no objeto global `spot`. confira `global.d.ts` para documentação da api.
 
 ## desenvolvimento
 
@@ -108,4 +134,4 @@ go build src/spot.go
 ## em breve
 
 - sass
-- injetar extensões e aplicativos customizados
+- injetar aplicativos customizados
