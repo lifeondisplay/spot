@@ -14,7 +14,7 @@
      * 
      * https://jsonbin.io/
      * 
-     * e e crie um json vazio:
+     * e e crie um jsonbin com o objeto padrão:
 
 {
     "trashSongList": {},
@@ -26,6 +26,7 @@
 
         https://api.jsonbin.io/b/XXXXXXXXXXXXXXXXXXXX
 
+     * salve esse arquivo, rode o comando "apply" no spot para fazer a alteração
      */
 
     const jsonBinURL = "";
@@ -187,7 +188,12 @@
     });
 
     function watchChange() {
-        const isBanned = trashSongList[Spot.Player.data.track.uri];
+        const data = Spot.Player.data || Spot.Queue;
+
+        if (!data)
+            return;
+
+        const isBanned = trashSongList[data.track.uri];
 
         updateIconPosition();
         updateTrackIconState(isBanned);
@@ -205,7 +211,7 @@
         }
 
         let uriIndex = 0;
-        let artistUri = Spot.Player.data.track.metadata["artist_uri"];
+        let artistUri = data.track.metadata["artist_uri"];
 
         while (artistUri) {
             if (trashArtistList[artistUri]) {
@@ -216,7 +222,7 @@
 
             uriIndex++;
 
-            artistUri = Spot.Player.data.track.metadata["artist_uri:" + uriIndex];
+            artistUri = data.track.metadata["artist_uri:" + uriIndex];
         }
     }
 
