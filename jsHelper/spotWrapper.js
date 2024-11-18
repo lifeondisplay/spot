@@ -1,4 +1,8 @@
 const Spot = {
+    get CosmosAPI() {return window.cosmos},
+    get BridgeAPI() {return window.bridge},
+    get LiveAPI() {return window.live},
+
     Player: {
         addEventListener: (type, callback) => {
             if (!(type in Spot.Player.eventListeners)) {
@@ -8,16 +12,12 @@ const Spot = {
             Spot.Player.eventListeners[type].push(callback)
         },
 
-        back: undefined,
-        data: undefined,
-        decreaseVolume: undefined,
-
         dispatchEvent: (event) => {
             if (!(event.type in Spot.Player.eventListeners)) {
                 return true;
             }
 
-            var stack = Spot.Player.eventListeners[event.type];
+            const stack = Spot.Player.eventListeners[event.type];
 
             for (let i = 0; i < stack.length; i++) {
                 if (typeof stack[i] === "function") {
@@ -29,18 +29,8 @@ const Spot = {
         },
 
         eventListeners: {},
-        formatTime: undefined,
-        getDuration: undefined,
+
         getHeart: () => {Spot.LiveAPI(Spot.Player.data.track.uri).get("added")},
-        getMute: undefined,
-        getProgressMs: undefined,
-        getProgressPercent: undefined,
-        getRepeat: undefined,
-        getShuffle: undefined,
-        getVolume: undefined,
-        increaseVolume: undefined,
-        isPlaying: undefined,
-        next: undefined,
 
         pause: () => {Spot.Player.isPlaying() && Spot.Player.togglePlay()},
         play: () => {!Spot.Player.isPlaying() && Spot.Player.togglePlay()},
@@ -50,7 +40,7 @@ const Spot = {
                 return;
             }
 
-            var stack = Spot.Player.eventListeners[type];
+            const stack = Spot.Player.eventListeners[type];
 
             for (let i = 0; i < stack.length; i++) {
                 if (stack[i] === callback) {
@@ -61,50 +51,11 @@ const Spot = {
             }
         },
 
-        seek: undefined,
-        setMute: undefined,
-        setRepeat: undefined,
-        setShuffle: undefined,
-        setVolume: undefined,
-
         skipBack: (amount = 15e3) => {Spot.Player.seek(Spot.Player.getProgressMs() - amount)},
         skipForward: (amount = 15e3) => {Spot.Player.seek(Spot.Player.getProgressMs() + amount)},
         
-        toggleHeart: () => {document.querySelector('[data-interaction-target="save-remove-button"]').click()},
-        
-        toggleMute: undefined,
-        togglePlay: undefined,
-        toggleRepeat: undefined,
-        toggleShuffle: undefined,
+        toggleHeart: () => {document.querySelector('[data-interaction-target="save-remove-button"]').click()}
     },
-
-    addToQueue: undefined,
-
-    BridgeAPI: undefined,
-
-    CosmosAPI: undefined,
-
-    Event: undefined,
-
-    EventDispatcher: undefined,
-
-    extractColors: undefined,
-
-    getAudioData: undefined,
-
-    Keyboard: undefined,
-
-    LibURI: undefined,
-
-    LiveAPI: undefined,
-
-    LocalStorage: undefined,
-
-    PlaybackControl: undefined,
-
-    Queue: undefined,
-
-    removeFromQueue: undefined,
 
     showNotification: (text) => {
         Spot.EventDispatcher.dispatchEvent(
@@ -121,7 +72,7 @@ const Spot = {
             "EventDispatcher",
             "getAudioData",
             "Keyboard",
-            "LibURI",
+            "URI",
             "LiveAPI",
             "LocalStorage",
             "PlaybackControl",
@@ -190,7 +141,7 @@ const Spot = {
     }
 }
 
-Spot.LibURI = (function () {
+Spot.URI = (function () {
     /**
     * Copyright (c) 2017 Spotify AB
     *
@@ -727,6 +678,7 @@ Spot.LibURI = (function () {
      */
     var _parseFromComponents = function (components, format, query) {
         var _current = 0;
+
         query = query || {};
 
         var _getNextComponent = function () {
@@ -737,8 +689,9 @@ Spot.LibURI = (function () {
             var component = _getNextComponent();
 
             if (component.length > 22) {
-                throw new Error('Invalid ID');
+                throw new Error('id inválido');
             }
+
             return component;
         };
 
@@ -748,6 +701,7 @@ Spot.LibURI = (function () {
 
         var _getRemainingString = function () {
             var separator = (format == Format.URI) ? ':' : '/';
+
             return components.slice(_current).join(separator);
         };
 
@@ -759,8 +713,10 @@ Spot.LibURI = (function () {
         switch (part) {
             case URI.Type.ALBUM:
                 return URI.albumURI(_getIdComponent(), parseInt(_getNextComponent(), 10));
+
             case URI.Type.AD:
                 return URI.adURI(_getNextComponent());
+
             case URI.Type.ARTIST:
                 id = _getIdComponent();
                 if (_getNextComponent() == URI.Type.TOP) {
@@ -768,18 +724,25 @@ Spot.LibURI = (function () {
                 } else {
                     return URI.artistURI(id);
                 }
+
             case URI.Type.AUDIO_FILE:
                 return URI.audioFileURI(_getNextComponent(), _getNextComponent());
+
             case URI.Type.DAILY_MIX:
                 return URI.dailyMixURI(_getIdComponent());
+
             case URI.Type.TEMP_PLAYLIST:
                 return URI.temporaryPlaylistURI(_getNextComponent(), _getRemainingString());
+
             case URI.Type.PLAYLIST:
                 return URI.playlistV2URI(_getIdComponent());
+
             case URI.Type.SEARCH:
                 return URI.searchURI(_decodeComponent(_getRemainingString(), format));
+
             case URI.Type.TRACK:
                 return URI.trackURI(_getIdComponent(), _getNextComponent(), query.context, query.play);
+
             case URI.Type.TRACKSET:
                 var name = _decodeComponent(_getNextComponent());
                 var tracksArray = _getNextComponent();
@@ -800,6 +763,7 @@ Spot.LibURI = (function () {
                 return URI.tracksetURI(tracksetTracks, name, index);
             case URI.Type.CONTEXT_GROUP:
                 return URI.contextGroupURI(_getNextComponent(), _getNextComponent());
+
             case URI.Type.TOP:
                 var type = _getNextComponent();
                 if (_getNextComponent() == URI.Type.GLOBAL) {
@@ -807,21 +771,27 @@ Spot.LibURI = (function () {
                 } else {
                     return URI.toplistURI(type, _getNextComponent(), false);
                 }
+
             case URI.Type.USER:
                 var username = _decodeComponent(_getNextComponent(), format);
                 var text = _getNextComponent();
+
                 if (username == URI.Type.FACEBOOK && text != null) {
                     return URI.facebookURI(parseInt(text, 10));
                 } else if (text != null) {
                     switch (text) {
                         case URI.Type.PLAYLIST:
                             return URI.playlistURI(username, _getIdComponent());
+
                         case URI.Type.FOLDER:
                             return URI.folderURI(username, _getIdComponent());
+
                         case URI.Type.COLLECTION_TRACK_LIST:
                             return URI.collectionTrackList(username, _getIdComponent());
+
                         case URI.Type.COLLECTION:
                             var collectionItemType = _getNextComponent();
+
                             switch (collectionItemType) {
                                 case URI.Type.ALBUM:
                                     id = _getIdComponent();
@@ -984,9 +954,11 @@ Spot.LibURI = (function () {
     URI.prototype.toURI = function () {
         return URI_PREFIX + _getComponents(this, Format.URI).join(':');
     };
+
     URI.prototype.toString = function () {
         return this.toURI();
     };
+
     URI.prototype.toURLPath = function (opt_leadingSlash) {
         var components = _getComponents(this, Format.URL);
         if (components[0] === URI.Type.APP) {
@@ -1008,66 +980,92 @@ Spot.LibURI = (function () {
 
         if (shouldStripEmptyComponents) {
             var _temp = [];
+
             for (var i = 0, l = components.length; i < l; i++) {
                 var component = components[i];
+
                 if (!!component) {
                     _temp.push(component);
                 }
             }
+
             components = _temp;
         }
+
         var path = components.join('/');
+
         return opt_leadingSlash ? '/' + path : path;
     };
+
     URI.prototype.toPlayURL = function () {
         return PLAY_HTTPS_PREFIX + this.toURLPath();
     };
+
     URI.prototype.toURL = function () {
         return this.toPlayURL();
     };
+
     URI.prototype.toOpenURL = function () {
         return OPEN_HTTPS_PREFIX + this.toURLPath();
     };
+
     URI.prototype.toSecurePlayURL = function () {
         return this.toPlayURL();
     };
+
     URI.prototype.toSecureURL = function () {
         return this.toPlayURL();
     };
+
     URI.prototype.toSecureOpenURL = function () {
         return this.toOpenURL();
     };
+
     URI.prototype.idToByteString = function () {
         var hexId = Base62.toHex(this._base62Id);
+
         if (!hexId) {
             var zero = '';
+
             for (var i = 0; i < 16; i++) {
                 zero += String.fromCharCode(0);
             }
+
             return zero;
         }
+
         var data = '';
+
         for (var i = 0; i < 32; i += 2) {
             var upper = Base62.ID16[hexId.charCodeAt(i)];
             var lower = Base62.ID16[hexId.charCodeAt(i + 1)];
             var byte = (upper << 4) + lower;
+
             data += String.fromCharCode(byte);
         }
+
         return data;
     };
 
     URI.prototype.getPath = function () {
         var uri = this.toString().replace(/[#?].*/, '');
+
         return uri;
     }
 
     URI.prototype.getBase62Id = function () {
         return this._base62Id;
     }
+
     URI.prototype.isSameIdentity = function (uri) {
         var uriObject = URI.from(uri);
-        if (!uriObject) return false;
-        if (this.toString() === uri.toString()) return true;
+
+        if (!uriObject)
+            return false;
+
+        if (this.toString() === uri.toString())
+            return true;
+
         if (
             (this.type === URI.Type.PLAYLIST || this.type === URI.Type.PLAYLIST_V2) &&
             (uriObject.type === URI.Type.PLAYLIST || uriObject.type === URI.Type.PLAYLIST_V2)
@@ -1075,6 +1073,7 @@ Spot.LibURI = (function () {
             return this.id === uriObject.id;
         } else if (this.type === URI.Type.STATION && uriObject.type === URI.Type.STATION) {
             var thisStationContextUriObject = _parseFromComponents(this.args, Format.URI);
+            
             return !!thisStationContextUriObject &&
                 thisStationContextUriObject.isSameIdentity(
                     _parseFromComponents(uriObject.args, Format.URI)
@@ -1083,10 +1082,12 @@ Spot.LibURI = (function () {
             return false;
         }
     }
+
     URI.Type = {
         EMPTY: 'empty',
         ALBUM: 'album',
         AD: 'ad',
+
         /** URI particle; not an actual URI. */
         APP: 'app',
         APPLICATION: 'application',
@@ -1100,11 +1101,13 @@ Spot.LibURI = (function () {
         CONTEXT_GROUP: 'context-group',
         DAILY_MIX: 'dailymix',
         EPISODE: 'episode',
+
         /** URI particle; not an actual URI. */
         FACEBOOK: 'facebook',
         FOLDER: 'folder',
         FOLLOWERS: 'followers',
         FOLLOWING: 'following',
+
         /** URI particle; not an actual URI. */
         GLOBAL: 'global',
         IMAGE: 'image',
@@ -1115,6 +1118,7 @@ Spot.LibURI = (function () {
         LIBRARY: 'library',
         MOSAIC: 'mosaic',
         PLAYLIST: 'playlist',
+
         /** Only used for URI classification. Not a valid URI fragment. */
         PLAYLIST_V2: 'playlist-v2',
         PROFILE: 'profile',
@@ -1129,97 +1133,129 @@ Spot.LibURI = (function () {
         STARRED: 'starred',
         STATION: 'station',
         TEMP_PLAYLIST: 'temp-playlist',
+
         /** URI particle; not an actual URI. */
         TOP: 'top',
         TOPLIST: 'toplist',
         TRACK: 'track',
         TRACKSET: 'trackset',
+
         /** URI particle; not an actual URI. */
         USER: 'user',
         USER_TOPLIST: 'user-toplist',
         USER_TOP_TRACKS: 'user-top-tracks',
+
         /** Deprecated contant. Please use USER_TOP_TRACKS. */
         USET_TOP_TRACKS: 'user-top-tracks'
     };
+
     URI.fromString = function (str) {
         var splitted = _splitIntoComponents(str);
+
         return _parseFromComponents(splitted.components, splitted.format, splitted.query);
     };
+
     URI.from = function (value) {
         try {
             if (value instanceof URI) {
                 return value;
             }
+
             if (typeof value == 'object' && value.type) {
                 return new URI(null, value);
             }
+
             return URI.fromString(value.toString());
         } catch (e) {
             return null;
         }
     };
+
     URI.fromByteString = function (type, idByteString, opt_args) {
         while (idByteString.length != 16) {
             idByteString = String.fromCharCode(0) + idByteString;
         }
+
         var hexId = '';
+
         for (var i = 0; i < idByteString.length; i++) {
             var byte = idByteString.charCodeAt(i);
+
             hexId += Base62.HEX256[byte];
         }
+
         var id = Base62.fromHex(hexId);
         var args = opt_args || {};
+
         args.id = id;
+
         return new URI(type, args);
     };
+
     URI.clone = function (uri) {
         if (!(uri instanceof URI)) {
             return null;
         }
+
         return new URI(null, uri);
     };
+
     URI.getCanonicalUsername = function (username) {
         return _encodeComponent(username, Format.URI);
     };
+
     URI.getDisplayUsername = function (username) {
         return _decodeComponent(username, Format.URI);
     };
+
     URI.idToHex = function (id) {
         if (id.length == 22) {
             return Base62.toHex(id);
         }
+
         return id;
     };
+
     URI.hexToId = function (hex) {
         if (hex.length == 32) {
             return Base62.fromHex(hex);
         }
+
         return hex;
     };
+
     URI.emptyURI = function () {
         return new URI(URI.Type.EMPTY, {});
     };
+
     URI.albumURI = function (id, disc) {
         return new URI(URI.Type.ALBUM, { id: id, disc: disc });
     };
+
     URI.adURI = function (id) {
         return new URI(URI.Type.AD, { id: id });
     };
+
     URI.audioFileURI = function (extension, id) {
         return new URI(URI.Type.AUDIO_FILE, { id: id, extension: extension });
     };
+
     URI.artistURI = function (id) {
         return new URI(URI.Type.ARTIST, { id: id });
     };
+
     URI.artistToplistURI = function (id, toplist) {
         return new URI(URI.Type.ARTIST_TOPLIST, { id: id, toplist: toplist });
     };
+
     URI.dailyMixURI = function (id) {
         return new URI(URI.Type.DAILY_MIX, { id: id });
     };
+
     URI.searchURI = function (query) {
         return new URI(URI.Type.SEARCH, { query: query });
     };
+
     URI.trackURI = function (id, anchor, context, play) {
         return new URI(URI.Type.TRACK, {
             id: id,
@@ -1228,6 +1264,7 @@ Spot.LibURI = (function () {
             play: play
         });
     };
+
     URI.tracksetURI = function (tracks, name, index) {
         return new URI(URI.Type.TRACKSET, {
             tracks: tracks,
@@ -1235,54 +1272,71 @@ Spot.LibURI = (function () {
             index: isNaN(index) ? null : index
         });
     };
+
     URI.facebookURI = function (uid) {
         return new URI(URI.Type.FACEBOOK, { uid: uid });
     };
+
     URI.followersURI = function (username) {
         return new URI(URI.Type.FOLLOWERS, { username: username });
     };
+
     URI.followingURI = function (username) {
         return new URI(URI.Type.FOLLOWING, { username: username });
     };
+
     URI.playlistURI = function (username, id) {
         return new URI(URI.Type.PLAYLIST, { username: username, id: id });
     };
+
     URI.playlistV2URI = function (id) {
         return new URI(URI.Type.PLAYLIST_V2, { id: id });
     };
+
     URI.folderURI = function (username, id) {
         return new URI(URI.Type.FOLDER, { username: username, id: id });
     };
+
     URI.collectionTrackList = function (username, id) {
         return new URI(URI.Type.COLLECTION_TRACK_LIST, { username: username, id: id });
     };
+
     URI.starredURI = function (username) {
         return new URI(URI.Type.STARRED, { username: username });
     };
+
     URI.userToplistURI = function (username, toplist) {
         return new URI(URI.Type.USER_TOPLIST, { username: username, toplist: toplist });
     };
+
     URI.userTopTracksURI = function (username) {
         return new URI(URI.Type.USER_TOP_TRACKS, { username: username });
     };
+
     URI.toplistURI = function (toplist, country, global) {
         return new URI(URI.Type.TOPLIST, { toplist: toplist, country: country, global: !!global });
     };
+
     URI.inboxURI = function (username) {
         return new URI(URI.Type.INBOX, { username: username });
     };
+
     URI.rootlistURI = function (username) {
         return new URI(URI.Type.ROOTLIST, { username: username });
     };
+
     URI.publishedRootlistURI = function (username) {
         return new URI(URI.Type.PUBLISHED_ROOTLIST, { username: username });
     };
+
     URI.localArtistURI = function (artist) {
         return new URI(URI.Type.LOCAL_ARTIST, { artist: artist });
     };
+
     URI.localAlbumURI = function (artist, album) {
         return new URI(URI.Type.LOCAL_ALBUM, { artist: artist, album: album });
     };
+
     URI.localURI = function (artist, album, track, duration) {
         return new URI(URI.Type.LOCAL, {
             artist: artist,
@@ -1291,52 +1345,67 @@ Spot.LibURI = (function () {
             duration: duration
         });
     };
+
     URI.libraryURI = function (username, category) {
         return new URI(URI.Type.LIBRARY, { username: username, category: category });
     };
+
     URI.collectionURI = function (username, category) {
         return new URI(URI.Type.COLLECTION, { username: username, category: category });
     };
+
     URI.temporaryPlaylistURI = function (origin, data) {
         return new URI(URI.Type.TEMP_PLAYLIST, { origin: origin, data: data });
     };
+
     URI.contextGroupURI = function (origin, name) {
         return new URI(URI.Type.CONTEXT_GROUP, { origin: origin, name: name });
     };
+
     URI.profileURI = function (username, args) {
         return new URI(URI.Type.PROFILE, { username: username, args: args });
     };
+
     URI.imageURI = function (id) {
         return new URI(URI.Type.IMAGE, { id: id });
     };
+
     URI.mosaicURI = function (ids) {
         return new URI(URI.Type.MOSAIC, { ids: ids });
     };
+
     URI.radioURI = function (args) {
         args = typeof args === 'undefined' ? '' : args;
         return new URI(URI.Type.RADIO, { args: args });
     };
+
     URI.specialURI = function (args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.SPECIAL, { args: args });
     };
+
     URI.stationURI = function (args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.STATION, { args: args });
     };
+
     URI.applicationURI = function (id, args) {
         args = typeof args === 'undefined' ? [] : args;
         return new URI(URI.Type.APPLICATION, { id: id, args: args });
     };
+
     URI.collectionAlbumURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_ALBUM, { username: username, id: id });
     };
+
     URI.collectionMissingAlbumURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_MISSING_ALBUM, { username: username, id: id });
     };
+
     URI.collectionArtistURI = function (username, id) {
         return new URI(URI.Type.COLLECTION_ARTIST, { username: username, id: id });
     };
+
     URI.episodeURI = function (id, context, play) {
         return new URI(URI.Type.EPISODE, {
             id: id,
@@ -1344,9 +1413,11 @@ Spot.LibURI = (function () {
             play: play
         });
     };
+
     URI.showURI = function (id) {
         return new URI(URI.Type.SHOW, { id: id });
     };
+
     URI.concertURI = function (id) {
         return new URI(URI.Type.CONCERT, { id: id });
     };
@@ -1376,13 +1447,10 @@ Spot.LibURI = (function () {
     URI.isStation = function (uri) { return (URI.from(uri) || {}).type === URI.Type.STATION; };
     URI.isTrack = function (uri) { return (URI.from(uri) || {}).type === URI.Type.TRACK; };
     URI.isProfile = function (uri) { return (URI.from(uri) || {}).type === URI.Type.PROFILE; };
-    URI.isPlaylistV1OrV2 = function (uri) {
-        var uriObject = URI.from(uri);
-        return !!uriObject && (uriObject.type === URI.Type.PLAYLIST || uriObject.type === URI.Type.PLAYLIST_V2);
-    };
+    URI.isPlaylistV1OrV2 = function (uri) { var uriObject = URI.from(uri); return !!uriObject && (uriObject.type === URI.Type.PLAYLIST || uriObject.type === URI.Type.PLAYLIST_V2); };
 
     /**
-     * Export public interface
+     * exportar interface pública
      */
     return URI;
 })();
@@ -1391,16 +1459,20 @@ Spot.getAudioData = (uri) => {
     return new Promise((resolve, reject) => {
         uri = uri || Spot.Player.data.track.uri;
         const uriObj = Spot.LibURI.from(uri);
+
         if (!uriObj && uriObj.Type !== Spot.LibURI.Type.TRACK) {
-            reject("URI is invalid.");
+            reject("uri inválido.");
+
             return;
         }
 
         Spot.CosmosAPI.resolver.get(
             `hm://audio-attributes/v1/audio-analysis/${uriObj.getBase62Id()}`,
+
             (error, payload) => {
                 if (error) {
                     reject(error);
+
                     return;
                 }
 
@@ -1412,25 +1484,32 @@ Spot.getAudioData = (uri) => {
 Spot.getAblumArtColors = (uri) => {
     return new Promise((resolve, reject) => {
         uri = uri || Spot.Player.data.track.uri;
+
         if (Spot.LibURI.isTrack(uri)) {
-            reject("URI is invalid.");
+            reject("uri inválido.");
+
             return;
         }
 
         Spot.CosmosAPI.resolver.get(
             `hm://colorextractor/v1/extract-presets?uri=${uri}&format=json`,
+
             (error, payload) => {
                 if (error) {
                     reject(error);
+
                     return;
                 }
 
                 const body = payload.getJSONBody();
+
                 if (body.entries && body.entries.length) {
                     const list = {};
+
                     for (const color of body.entries[0].color_swatches) {
                         list[color.preset] = `#${color.color.toString(16).padStart(3, "0")}`;
                     }
+
                     resolve(list);
                 } else {
                     resolve(null);
@@ -1440,23 +1519,114 @@ Spot.getAblumArtColors = (uri) => {
     });
 }
 
-/**
- * Set cosmos, bridge, live API to Spot object
- */
-(function findAPI() {
-    if (!Spot.CosmosAPI) {
-        Spot.CosmosAPI = window.cosmos;
-    }
-    if (!Spot.BridgeAPI) {
-        Spot.BridgeAPI = window.bridge;
-    }
-    if (!Spot.LiveAPI) {
-        Spot.LiveAPI = window.live;
+Spot.Menu = (function() {
+    const collection = new Set();
+    const menuEl = document.getElementById("PopoverMenu-container");
+
+    // observando o menu do perfil
+    new MutationObserver(() => {
+        const menuRoot = menuEl.querySelector(".Menu__root-items");
+        
+        if (menuRoot) {
+            for (const item of collection) {
+                menuRoot.prepend(item);
+            }
+        }
+    }).observe(menuEl, { childList: true });
+
+    class Item {
+        constructor(name, isEnabled, onClick) {
+            this.item = document.createElement("button");
+            this.item.innerText = name;
+            this.item.classList.add("MenuItem");
+            this.item.onclick = () => {onClick(this)};
+
+            this.item.onmouseenter = () => {
+                menuEl.querySelectorAll(".selected").forEach(e => e.classList.remove("selected"));
+                
+                this.item.classList.add("selected");
+            }
+
+            this.item.onmouseleave = () => {
+                this.item.classList.remove("selected");
+            }
+
+            this.setState(isEnabled);
+        }
+
+        setName(name) {
+            this.item.innerText = name
+        }
+
+        setState(isEnabled) {
+            if (isEnabled) {
+                this.item.classList.add(
+                    "MenuItemToggle--checked",
+                    "MenuItem--is-active"
+                );
+            } else {
+                this.item.classList.remove(
+                    "MenuItemToggle--checked",
+                    "MenuItem--is-active"
+                );
+            }
+        }
+
+        register() {
+            collection.add(this.item);
+        }
+
+        deregister() {
+            collection.delete(this.item);
+        }
+
+        getElement() {
+            return this.item;
+        }
     }
 
-    if (!Spot.CosmosAPI
-        || !Spot.BridgeAPI
-        || !Spot.LiveAPI) {
-        setTimeout(findAPI, 1000)
+    class SubMenu {
+        constructor(name, subItems) {
+            this.item = document.createElement("div");
+            this.item.innerText = name;
+            this.item.classList.add("MenuItem", "MenuItem--has-submenu");
+
+            const subMenu = document.createElement("div");
+            subMenu.classList.add("Menu", "Menu--is-submenu");
+
+            for (const item of subItems) {
+                subMenu.appendChild(item.getElement());
+            }
+
+            this.item.appendChild(subMenu);
+
+            this.item.onmouseenter = () => {
+                subMenu.classList.add("open");
+                this.item.classList.add("selected");
+            };
+
+            subMenu.onmouseleave = () => {
+                subMenu.classList.remove("open");
+                this.item.classList.remove("selected");
+            };
+        }
+
+        setName(name) {
+            this.item.innerText = name
+        }
+
+        register() {
+            collection.add(this.item);
+        }
+
+        deregister() {
+            collection.delete(this.item);
+        }
+
+        getElement() {
+            return this.item;
+        }
     }
+
+    return { Item, SubMenu }
 })();
