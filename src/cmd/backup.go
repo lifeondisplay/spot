@@ -6,16 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"../backup"
-	"../preprocess"
-	"../status/backup"
-	"../utils"
+	"github.com/lifeondisplay/spot/src/backup"
+	"github.com/lifeondisplay/spot/src/preprocess"
+	backupstatus "github.com/lifeondisplay/spot/src/status/backup"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // backup
 func Backup() {
 	backupVersion := backupSection.Key("version").MustString("")
-	curBackupStatus := backupstatus.Get(spotifyPath, backupFolder, backupVersion)
+	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
 
 	if curBackupStatus != backupstatus.EMPTY {
 		utils.PrintWarning("há backup disponível, mas limpe o backup atual primeiro!")
@@ -27,7 +27,7 @@ func Backup() {
 
 	utils.PrintBold("fazendo backup de arquivos de aplicativos:")
 
-	if err := backup.Start(spotifyPath, backupFolder); err != nil {
+	if err := backup.Start(prefsPath, backupFolder); err != nil {
 		log.Fatal(err)
 	}
 
@@ -105,7 +105,7 @@ func ClearBackup() {
 // restore
 func Restore() {
 	backupVersion := backupSection.Key("version").MustString("")
-	curBackupStatus := backupstatus.Get(spotifyPath, backupFolder, backupVersion)
+	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
 
 	if curBackupStatus == backupstatus.EMPTY {
 		utils.PrintError(`você não fez backup.`)
@@ -127,5 +127,6 @@ func Restore() {
 	utils.Copy(backupFolder, appFolder, false, []string{".spa"})
 
 	utils.PrintSuccess("o spotify foi restaurado.")
-	utils.RestartSpotify(spotifyPath)
+	
+	RestartSpotify()
 }

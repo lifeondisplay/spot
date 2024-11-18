@@ -8,10 +8,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -210,31 +208,9 @@ func ModifyFile(path string, repl func(string) string) {
 	ioutil.WriteFile(path, []byte(content), 0700)
 }
 
-// encontra o path do arquivo `prefs` baseado no sistema operacional e retorna
-// uma referência de `ini.file`
-func GetPrefsCfg(spotifyPath string) (*ini.File, string, error) {
-	var path string
-
-	if runtime.GOOS == "windows" {
-		path = filepath.Join(spotifyPath, "prefs")
-	} else if runtime.GOOS == "linux" {
-		path = filepath.Join(os.Getenv("HOME"), ".config", "spotify", "prefs")
-	} else if runtime.GOOS == "darwin" {
-		path = filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "Spotify", "prefs")
-	}
-
-	cfg, err := ini.Load(path)
-
-	if err != nil {
-		cfg = ini.Empty()
-	}
-
-	return cfg, path, nil
-}
-
 // getspotifyversion
-func GetSpotifyVersion(spotifyPath string) string {
-	pref, _, err := GetPrefsCfg(spotifyPath)
+func GetSpotifyVersion(prefsPath string) string {
+	pref, _, err := ini.Load(prefsPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -264,19 +240,23 @@ func GetJsHelperDir() string {
 	return filepath.Join(GetExecutableDir(), "jsHelper")
 }
 
-// restartspotify
-func RestartSpotify(spotifyPath string) {
-	if runtime.GOOS == "windows" {
-		exec.Command("taskkill", "/F", "/IM", "spotify.exe").Run()
-		
-		exec.Command(filepath.Join(spotifyPath, "spotify.exe")).Start()
-	} else if runtime.GOOS == "linux" {
-		exec.Command("pkill", "spotify").Run()
-
-		exec.Command(filepath.Join(spotifyPath, "spotify")).Start()
-	} else if runtime.GOOS == "darwin" {
-		exec.Command("pkill", "Spotify").Run()
-		
-		exec.Command("open", "/Applications/Spotify.app").Start()
+// encontra sinalizadores em matrizes de argumentos
+// retorna true se um dos sinalizadores solicitados for encontrado
+func FindFlag(args []string, flags ...string) bool {
+	for _, a := range args {
+		for _, f := range flags {
+			if a == f {
+				return true
+			}
+		}
 	}
+
+	return false
+}
+
+// acrescenta a string de hora atual ao texto e retorna uma nova string
+func PrependTime(text string) string {
+	date := time.Now()
+	
+	return fmt.Sprintf("%02d:%02d:%02d ", date.Hour(), date.Minute(), date.Second()) + text
 }

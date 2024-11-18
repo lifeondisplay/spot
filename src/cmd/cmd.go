@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"../utils"
 	"github.com/go-ini/ini"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 var (
@@ -15,6 +15,7 @@ var (
 	backupFolder            = getBackupFolder()
 	quiet                   bool
 	spotifyPath             string
+	prefsPath               string
 	cfg                     utils.Config
 	settingSection          *ini.Section
 	backupSection           *ini.Section
@@ -32,13 +33,36 @@ func Init(isQuiet bool) {
 
 	spotifyPath = settingSection.Key("spotify_path").String()
 
-	if len(spotifyPath) == 0 {
-		utils.PrintError(`por favor, configure "spotify_path" em config.ini`)
+	if len(spotifyPath) != 0 {
+		if _, err := os.Stat(spotifyPath); err != nil {
+			utils.PrintError(spotifyPath + ` não existe ou não é um path válido. defina manualmente "spotify_path" em config.ini para corrigir o diretório do spotify.`)
+			
+			os.Exit(1)
+		}
+	} else if spotifyPath = utils.FindAppPath(); len(spotifyPath) != 0 {
+		settingSection.Key("spotify_path").SetValue(spotifyPath)
+
+		cfg.Write()
+	} else {
+		utils.PrintError(`não foi possível detectar a localização do spotify. defina manualmente "spotify_path" em config.ini`)
+		
 		os.Exit(1)
 	}
 
-	if _, err := os.Stat(spotifyPath); err != nil {
-		utils.PrintError(spotifyPath + ` não existe ou não é um caminho válido. por favor, configure "spotify_path" em config.ini para corrigir o diretório do spotify.`)
+	prefsPath = settingSection.Key("prefs_path").String()
+
+	if len(prefsPath) != 0 {
+		if _, err := os.Stat(prefsPath); err != nil {
+			utils.PrintError(prefsPath + ` não existe ou não é um path válido. defina manualmente "prefs_path" em config.ini para corrigir o path do arquivo "prefs".`)
+			
+			os.Exit(1)
+		}
+	} else if prefsPath = utils.FindPrefFilePath(); len(prefsPath) != 0 {
+		settingSection.Key("prefs_path").SetValue(prefsPath)
+		
+		cfg.Write()
+	} else {
+		utils.PrintError(`não foi possível detectar a localização do arquivo "prefs" do spotify. defina manualmente "prefs_path" em config.ini`)
 
 		os.Exit(1)
 	}

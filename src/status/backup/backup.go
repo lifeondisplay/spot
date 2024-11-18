@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"../../utils"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // enum é um tipo de constantes de status do backup
@@ -23,7 +23,7 @@ const (
 )
 
 // retorna o status da pasta de backup
-func Get(spotifyPath, backupPath, backupVersion string) Enum {
+func Get(prefsPath, backupPath, backupVersion string) Enum {
 	fileList, err := ioutil.ReadDir(backupPath)
 	if err != nil {
 		log.Fatal(err)
@@ -41,7 +41,7 @@ func Get(spotifyPath, backupPath, backupVersion string) Enum {
 	}
 
 	if spaCount > 0 {
-		spotifyVersion := utils.GetSpotifyVersion(spotifyPath)
+		spotifyVersion := utils.GetSpotifyVersion(prefsPath)
 		if backupVersion != spotifyVersion {
 			return OUTDATED
 		}
