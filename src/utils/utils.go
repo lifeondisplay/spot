@@ -3,7 +3,6 @@ package utils
 import (
 	"archive/zip"
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-ini/ini"
 )
@@ -163,6 +163,29 @@ func Copy(src, dest string, recursive bool, filters []string) error {
 	return nil
 }
 
+// copyfile
+func CopyFile(srcPath, dest string) error {
+	fSrc, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer fSrc.Close()
+
+	destPath := filepath.Join(dest, filepath.Base(srcPath))
+	fDest, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return err
+	}
+	defer fDest.Close()
+
+	_, err = io.Copy(fDest, fSrc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // utiliza regexp para encontrar qualquer coincidência do `input` com `regexpterm`
 // e substitui por `replaceterm` e então retorna uma nova string
 func Replace(input string, regexpTerm string, replaceTerm string) string {
@@ -198,8 +221,6 @@ func GetPrefsCfg(spotifyPath string) (*ini.File, string, error) {
 		path = filepath.Join(os.Getenv("HOME"), ".config", "spotify", "prefs")
 	} else if runtime.GOOS == "darwin" {
 		path = filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "Spotify", "prefs")
-	} else {
-		return nil, "", errors.New("Unsupported OS")
 	}
 
 	cfg, err := ini.Load(path)
@@ -230,19 +251,12 @@ func GetSpotifyVersion(spotifyPath string) string {
 
 // retorna o diretório do processo atual
 func GetExecutableDir() string {
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		exe, err := os.Executable()
-
-		if err != nil {
-			log.Fatal(err)
-		}
-		
-		return filepath.Dir(exe)
+	exe, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	log.Fatal("sistema operacional não suportado")
-
-	return ""
+	return filepath.Dir(exe)
 }
 
 // retorna o diretório jshelper no diretório do executável
