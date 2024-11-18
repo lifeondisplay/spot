@@ -56,3 +56,7 @@ function Dist {
     7z a -bb0 -mx9 "./bin/$(nameVersion)-windows-amd64.tar.gz" "./bin/windows/$($nameVersion)-darwin-amd64.tar" >$null 2>&1
     Write-Host "✔" -ForegroundColor Green
 }
+
+function Format {
+    prettier --print-width 80 --tab-width 4 --trailing-comma es5 --arrow-parens always --write .\Extensions\*.js
+}
