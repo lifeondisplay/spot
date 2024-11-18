@@ -217,22 +217,19 @@ que sejam clicáveis */
 }
 
 .card-puff__title-container {
-	background-color: rgba(0, 0, 0, 0) !important;
-	align-items: start !important;
+	background-color: transparent !important;
 }
 
 .card-puff.pressed .card-puff__image-wrapper,
 .card-puff.pressed .card-puff__info-container {
-  opacity: 0.7 !important;
+  	opacity: 0.7 !important;
 }
 
 .card-puff__title {
 	padding: 5px 10px 5px 10px !important;
-	background-color: rgba(var(--modspotify_rgb_cover_overlay_and_shadow),0.8) !important;
-	border-radius: 10px 10px 0 0 !important;
-	text-align: left !important;
-	width: 100% !important;
-	margin: 0 20px !important;
+	background-color: var(--modspotify_main_bg) !important;
+	border-radius: 4px;
+	border: 2px solid var(--modspotify_main_fg);
 }
 
 .card-puff__card-image:nth-child(1) {
@@ -649,6 +646,7 @@ body.remotebar .view-player .player-bar-wrapper {
 }
 
 .SidebarListItem--is-active:after,
+.RootlistItem--is-active:after,
 #view-navigation-bar .item.active:after { /* para linux */
 	background-color: transparent;
 	background-image: linear-gradient(90deg, var(--modspotify_sidebar_indicator_and_hover_button_bg) , transparent);
