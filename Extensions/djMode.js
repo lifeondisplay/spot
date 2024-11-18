@@ -286,6 +286,7 @@
                     "button-play"
                 );
 
+                playButton?.removeChild(playButton.querySelector("button"));
                 playButton.appendChild(newButton);
                 playButton.setAttribute("djmode-injected", "true");
 
