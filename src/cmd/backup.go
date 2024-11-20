@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/lifeondisplay/spot/src/status/spotify"
 	"io/ioutil"
 	"log"
 	"os"
@@ -91,7 +92,9 @@ func Backup() {
 
 // clearbackup
 func ClearBackup() {
-	if !quiet {
+	curSpotifystatus := spotifystatus.Get(spotifyPath)
+	
+	if curSpotifystatus != spotifystatus.STOCK && !quiet {
 		if !utils.ReadAnswer("antes de limpar o backup, certifique-se de ter restaurado ou reinstalado o spotify ao estado original. continuar? [s/n]: ", false) {
 			os.Exit(1)
 		}
@@ -100,15 +103,21 @@ func ClearBackup() {
 	if err := os.RemoveAll(backupFolder); err != nil {
 		utils.Fatal(err)
 	}
+	os.Mkdir(backupFolder, 0700)
+
 	if err := os.RemoveAll(rawFolder); err != nil {
 		utils.Fatal(err)
 	}
+	os.Mkdir(rawFolder, 0700)
+
 	if err := os.RemoveAll(themedFolder); err != nil {
 		utils.Fatal(err)
 	}
+	os.Mkdir(themedFolder, 0700)
 
 	backupSection.Key("version").SetValue("")
 	cfg.Write()
+	utils.PrintSuccess("backup limpo.")
 }
 
 // restore
