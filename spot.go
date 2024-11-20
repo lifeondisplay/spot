@@ -13,7 +13,12 @@ import (
 )
 
 const (
-	version = "0.4.0"
+	version = "0.4.1"
+)
+
+var (
+	quiet          = false
+	extensionFocus = false
 )
 
 func init() {
@@ -25,27 +30,17 @@ func init() {
 
 	log.SetFlags(0)
 
-	quiet := utils.FindFlag(os.Args, "-q", "--quite")
-
-	if quiet {
-		log.SetOutput(ioutil.Discard)
-	} else {
-		// suporte de output colorido para o windows
-		log.SetOutput(colorable.NewColorableStdout())
-	}
-
-	cmd.Init(quiet)
-
-	if len(os.Args) < 2 {
-		utils.PrintInfo(`rode "spot -h" para lista de comandos.`)
-
-		os.Exit(0)
-	}
+	// printa o output com cores no windows
+	log.SetOutput(colorable.NewColorableStdout())
 
 	for k, v := range os.Args {
+		if v[0] != '-' {
+			continue
+		}
+
 		switch v {
 			case "-c", "--config":
-				fmt.Print(cmd.GetConfigPath())
+				fmt.Println(cmd.GetConfigPath())
 
 				os.Exit(0)
 
@@ -64,10 +59,28 @@ func init() {
 				os.Exit(0)
 
 			case "-v", "--version":
-				fmt.Print(version)
+				fmt.Println(version)
 
 				os.Exit(0)
+
+			case "-e", "--extension":
+				extensionFocus = true
+
+			case "-q", "--quite":
+				quiet = true
 		}
+	}
+
+	if quiet {
+		log.SetOutput(ioutil.Discard)
+	}
+
+	cmd.Init(quiet)
+
+	if len(os.Args) < 2 {
+		utils.PrintInfo(`rode "spot -h" para lista de comandos.`)
+
+		os.Exit(0)
 	}
 }
 
@@ -87,7 +100,7 @@ func main() {
 				cmd.Apply()
 
 			case "update":
-				if utils.FindFlag(args, "-e", "--extension") {
+				if extensionFocus {
 					cmd.UpdateAllExtension()
 				} else {
 					cmd.UpdateCSS()
@@ -103,7 +116,7 @@ func main() {
 				cmd.SetDevTool(false)
 
 			case "watch":
-				if utils.FindFlag(args, "-e", "--extension") {
+				if extensionFocus {
 					cmd.WatchExtensions()
 				} else {
 					cmd.Watch()
@@ -124,40 +137,39 @@ func main() {
 }
 
 func help() {
-	fmt.Println("spot v" + version)
-	fmt.Print(`USO
-spot [<flag>] <comando>
+	utils.PrintBold("spot v" + version)
 
-DESCRIÇÃO
-personaliza a interface e a funcionalidade do cliente spotify
-
-COMANDOS
+	log.Println(utils.Bold("USAGE") +
+		"spot [-q] [-e] \x1B[4mcommand\033[0m...\n" +
+		"spot {-c | --config} | {-v | --version} | {-h | --help}\n\n" +
+		utils.Bold("DESCRIÇÃO") +
+		"personalize a interface e a funcionalidade do cliente spotify\n\n" +
+		utils.Bold("COMANDOS") + `
 backup              inicia o backup e o pré-processamento dos arquivos do aplicativo.
 apply               aplica a customização.
-update              atualiza o css.
+update              atualiza tema e as cores css.
 restore             restaura o spotify ao estado original.
 clear               limpa os arquivos de backup atuais.
-enable-devtool      ativa as ferramentas de desenvolvedor do spotify. (console, inspect, ...),
+enable-devtool      ativa as ferramentas de desenvolvedor do spotify.
                     pressione ctrl + shift + i no cliente para começar a usar.
 disable-devtool     desativa as ferramentas de desenvolvedor do spotify.
 watch               entra no modo de espectador. automaticamente atualiza o css quando o
                     arquivo color.ini ou user.css for alterado.
 restart				reinicia o cliente spotify.
 
-FLAGS
+` + utils.Bold("FLAGS") + `
 -q, --quiet         modo silencioso (sem output).
 -e, --extension     utilize com "update" ou "watch" para focar nas extensões.
 -c, --config        retorna o caminho do arquivo de configuração e saia.
 -h, --help          gera este texto de ajuda e saia.
 -v, --version       retorna o número da versão e saia.
 
-para informação de configuração, rode "spot -h config".
-`)
+para informação de configuração, rode "spot -h config".`)
 }
 
 func helpConfig() {
-	fmt.Print(`SIGNIFICADO DA CONFIGURAÇÃO
-[Setting]
+	utils.PrintBold("SIGNIFICADO DA CONFIGURAÇÃO")
+	log.Println(utils.Bold("[Configuração]") + `
 spotify_path
 	path para o diretório spotify
 
@@ -173,7 +185,7 @@ inject_css
 replace_colors
     se as cores personalizadas são aplicadas
 
-[Preprocesses]
+` + utils.Bold("[Pré-processos]") + `
 disable_sentry
     impede que o sentry envie log/erro/aviso do console aos desenvolvedores do spotify.
     ative se não quiser chamar a atenção deles ao desenvolver extensão ou aplicativo.
@@ -193,7 +205,7 @@ expose_apis
 	do spot que são úteis para fazer extensões para estender a
 	funcionalidade do spotify.
 
-[AdditionalOptions]
+` + utils.Bold("[Opções Adicionais]") + `
 experimental_features
     permite o acesso aos recursos experimentais do spotify. abra-o no
 	menu do perfil (canto superior direito).
@@ -223,6 +235,5 @@ song_page
 	reprodução nas quais ela aparece.
 
 visualization_high_framerate
-    força a visualização no aplicativo de letras para renderizar em 60fps.
-`)
+    força a visualização no aplicativo de letras para renderizar em 60fps.`)
 }
