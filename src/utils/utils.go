@@ -186,10 +186,10 @@ func CopyFile(srcPath, dest string) error {
 
 // utiliza regexp para encontrar qualquer coincidência do `input` com `regexpterm`
 // e substitui por `replaceterm` e então retorna uma nova string
-func Replace(input string, regexpTerm string, replaceTerm string) string {
+func Replace(input *string, regexpTerm string, replaceTerm string) {
 	re := regexp.MustCompile(regexpTerm)
 
-	return re.ReplaceAllString(input, replaceTerm)
+	*input = re.ReplaceAllString(*input, replaceTerm)
 }
 
 // abre um arquivo, altera o conteúdo desse arquivo executando o
@@ -238,20 +238,6 @@ func GetExecutableDir() string {
 // retorna o diretório jshelper no diretório do executável
 func GetJsHelperDir() string {
 	return filepath.Join(GetExecutableDir(), "jsHelper")
-}
-
-// encontra sinalizadores em matrizes de argumentos
-// retorna true se um dos sinalizadores solicitados for encontrado
-func FindFlag(args []string, flags ...string) bool {
-	for _, a := range args {
-		for _, f := range flags {
-			if a == f {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // acrescenta a string de hora atual ao texto e retorna uma nova string
