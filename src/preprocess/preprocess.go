@@ -83,7 +83,7 @@ func Start(extractedAppsPath string, flags Flag, callback func(appName string, e
 							var tags string
 
 							if flags.ExposeAPIs {
-								tags += `<script src="spicetifyWrapper.js"></script>`
+								tags += `<script src="spotWrapper.js"></script>`
 							}
 
 							tags += "\n<!--extensão-->"
@@ -99,7 +99,7 @@ func Start(extractedAppsPath string, flags Flag, callback func(appName string, e
 		})
 
 		if appName == "zlink" && flags.ExposeAPIs {
-			err := utils.Copy(utils.GetJsHelperDir(), appPath, false, []string{"spicetifyWrapper.js"})
+			err := utils.Copy(utils.GetJsHelperDir(), appPath, false, []string{"spotWrapper.js"})
 			if err != nil {
 				utils.Fatal(err)
 			}

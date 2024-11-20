@@ -16,14 +16,25 @@ import (
 func Apply() {
 	backupVersion := backupSection.Key("version").MustString("")
 	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
+	status := spotifystatus.Get(spotifyPath)
 
 	if curBackupStatus == backupstatus.EMPTY {
-		utils.PrintError(`você não fez nenhum backup. execute "spot backup" antes de aplicar.`)
+		if status == spotifystatus.STOCK {
+			utils.PrintError(`você não fez backup. rode "spot backup apply".`)
+		} else {
+			utils.PrintError(`você não fez backup e o backup do spotify não pode ser feito neste estado. reinstale o spotify e rode "spot backup apply".`)
+		}
 		
 		os.Exit(1)
 	} else if curBackupStatus == backupstatus.OUTDATED {
 		if !quiet {
 			utils.PrintWarning("a versão do spotify e a versão de backup são incompatíveis.")
+
+			if status == spotifystatus.STOCK {
+				utils.PrintInfo(`por favor, execute "spot backup apply".`)
+			} else {
+				utils.PrintInfo(`não é possível fazer backup do spotify neste estado. reinstale o spotify e rode "spot backup apply".`)
+			}
 
 			if !utils.ReadAnswer("continuar com a aplicação mesmo assim? [s/n] ", false) {
 				os.Exit(1)
@@ -32,14 +43,16 @@ func Apply() {
 	}
 
 	appFolder := filepath.Join(spotifyPath, "Apps")
-	status := spotifystatus.Get(spotifyPath)
 
 	extractedStock := false
 
 	if status != spotifystatus.APPLIED {
-		os.RemoveAll(appFolder)
-
-		utils.Copy(rawFolder, appFolder, true, nil)
+		if err := os.RemoveAll(appFolder); err != nil {
+			utils.Fatal(err)
+		}
+		if err := utils.Copy(rawFolder, appFolder, true, nil); err != nil {
+			utils.Fatal(err)
+		}
 
 		extractedStock = true
 	}
@@ -48,9 +61,13 @@ func Apply() {
 	injectCSS := settingSection.Key("inject_css").MustInt(0) == 1
 
 	if replaceColors {
-		utils.Copy(themedFolder, appFolder, true, nil)
+		if err := utils.Copy(themedFolder, appFolder, true, nil); err != nil {
+			utils.Fatal(err)
+		}
 	} else if !extractedStock {
-		utils.Copy(rawFolder, appFolder, true, nil)
+		if err := utils.Copy(rawFolder, appFolder, true, nil); err != nil {
+			utils.Fatal(err)
+		}
 	}
 
 	themeName, err := settingSection.GetKey("current_theme")
@@ -119,13 +136,13 @@ func UpdateAllExtension() {
 }
 
 func getExtensionPath(name string) (string, error) {
-	extFilePath := filepath.Join(utils.GetExecutableDir(), "Extensions", name)
+	extFilePath := filepath.Join(spotFolder, "Extensions", name)
 
 	if _, err := os.Stat(extFilePath); err == nil {
 		return extFilePath, nil
 	}
 
-	extFilePath = filepath.Join(spotFolder, "Extensions", name)
+	extFilePath = filepath.Join(utils.GetExecutableDir(), "Extensions", name)
 
 	if _, err := os.Stat(extFilePath); err == nil {
 		return extFilePath, nil
