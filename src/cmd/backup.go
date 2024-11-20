@@ -19,11 +19,8 @@ func Backup() {
 	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
 
 	if curBackupStatus != backupstatus.EMPTY {
-		utils.PrintWarning("há backup disponível, mas limpe o backup atual primeiro!")
+		utils.PrintInfo("há backup disponível, mas limpe o backup atual primeiro!")
 		ClearBackup()
-
-		backupSection.Key("version").SetValue("")
-		cfg.Write()
 	}
 
 	utils.PrintBold("fazendo backup de arquivos de aplicativos:")
@@ -95,7 +92,9 @@ func ClearBackup() {
 	curSpotifystatus := spotifystatus.Get(spotifyPath)
 	
 	if curSpotifystatus != spotifystatus.STOCK && !quiet {
-		if !utils.ReadAnswer("antes de limpar o backup, certifique-se de ter restaurado ou reinstalado o spotify ao estado original. continuar? [s/n]: ", false) {
+		utils.PrintWarning("antes de limpar o backup, certifique-se de ter restaurado ou reinstalado o spotify ao estado original.")
+
+		if !utils.ReadAnswer("continuar limpando mesmo assim? [s/n]: ", false) {
 			os.Exit(1)
 		}
 	}
@@ -124,18 +123,23 @@ func ClearBackup() {
 func Restore() {
 	backupVersion := backupSection.Key("version").MustString("")
 	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
+	curSpotifystatus := spotifystatus.Get(spotifyPath)
 
 	if curBackupStatus == backupstatus.EMPTY {
 		utils.PrintError(`você não fez backup.`)
 
+		if curSpotifystatus != spotifystatus.STOCK {
+			utils.PrintWarning(`mas o backup do spotify não pode ser feito neste estado. por favor, reinstale o spotify e execute "spot backup"`)
+		}
+
 		os.Exit(1)
 	} else if curBackupStatus == backupstatus.OUTDATED {
-		if !quiet {
-			utils.PrintWarning("a versão do spotify e a versão de backup são incompatíveis.")
-
-			if !utils.ReadAnswer("continuar restaurando mesmo assim? [s/n] ", false) {
-				os.Exit(1)
-			}
+		utils.PrintWarning("a versão do spotify e a versão de backup são incompatíveis.")
+		if curSpotifystatus == spotifystatus.STOCK {
+			utils.PrintInfo(`spotify está em estado de estoque. rode "spot backup" para fazer backup da versão atual do spotify.`)
+		}
+		if !quiet && !utils.ReadAnswer("continuar restaurando mesmo assim? [y/n] ", false) {
+			os.Exit(1)	
 		}
 	}
 
