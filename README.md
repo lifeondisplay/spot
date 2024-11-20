@@ -18,31 +18,42 @@ suporte para windows, macos e linux.
 
 #### windows
 
+no powershell, rode os seguintes comandos:
+
+```powershell
+Expand-Archive "$HOME\Downloads\spot-xxx.zip" "$HOME\spot"
+```
+
+com `$HOME/Downloads/spot-xxx.tar.gz` no path direto para o pacote baixado.
+
 extraia o pacote zip
 
-para utilizar o spot, você pode rodar o `spot.exe` diretamente com o seu path,
-ou adicione opcionalmente seu diretório no path de ambiente para rodar o `spot` aonde quiser
+opcionalmente, rode:
+
+```powershell
+Add-Content $PROFILE "Set-Alias spot `"$HOME\spot\spot.exe`""
+```
+
+reinicie o powershell. agora você pode rodar `spot` em qualquer lugar.
 
 #### linux e macos
 
 no terminal, rode os seguintes comandos:
 
 ```bash
-cd ~/
-mkdir spot
-cd spot
-tar xzf ~/Downloads/spot-xxx.tar.gz
+mkdir ~/spot
+tar xzf ~/Downloads/spot-xxx.tar.gz -C ~/spot
 ```
 
-com `~/Downloads/spot-xxx.tar.gz` apenas o path do pacote baixado
+com `~/Downloads/spot-xxx.tar.gz` apenas o path direto do pacote baixado
 
 opcionalmente, rode:
 
 ```bash
-echo 'spot=~/spot/spot' >> .bashrc
+sudo ln -s ~/spot/spot /usr/bin/spot
 ```
 
-você pode rodar `spot` em qualquer lugar
+agora você pode rodar `spot` em qualquer lugar
 
 ## uso básico
 
@@ -68,14 +79,26 @@ para atualizar o seu tema.
 
 no spotify, pressione <kbd>ctrl</kbd> + <kbd>shift</kbd> + <kbd>r</kbd>/<kbd>command</kbd> + <kbd>shift</kbd> + <kbd>r</kbd> para recarregar e receber atualização visual do seu tema.
 
+para outros comandos e informação de flags adicionais, por favor rode:
+
+```bash
+spot --help
+```
+
 ## customização
 
 #### arquivo de configuração
 
-está localizado em:
+localizado em:
 **windows**: `%userprofile%\.spot\config.ini`
 **linux:** `~/.spot/config.ini`  
 **macos:** `~/spot_data/config.ini`  
+
+para informação de detalhe de cada field de configuração, por favor rode:
+
+```bash
+spot --help config
+```
 
 #### temas
 
@@ -120,15 +143,26 @@ algumas apis do spotify vazaram e foram colocadas no objeto global `spot`. confi
 
 - [go](https://go.dev/dl/)
 
+clone o repositório e baixe as dependências:
+
 ```bash
-git clone https://github.com/lifeondisplay/spot
+go get github.com/lifeondisplay/spot
 ```
 
 ### build
 
+#### windows
+
+```powershell
+cd $HOME\go\src\github.com\lifeondisplay\spot
+go build -o spot.exe
+```
+
+#### linux e macos
+
 ```bash
-cd spot-cli
-go build src/spot.go
+cd ~/go/src/github.com/lifeondisplay/spot
+go build -o spot
 ```
 
 ## em breve
