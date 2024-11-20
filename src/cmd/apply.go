@@ -6,16 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"../apply"
-	"../status/backup"
-	"../status/spotify"
-	"../utils"
+	"github.com/lifeondisplay/spot/src/apply"
+	backupstatus "github.com/lifeondisplay/spot/src/status/backup"
+	spotifystatus "github.com/lifeondisplay/spot/src/status/spotify"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // aplicação
 func Apply() {
 	backupVersion := backupSection.Key("version").MustString("")
-	curBackupStatus := backupstatus.Get(spotifyPath, backupFolder, backupVersion)
+	curBackupStatus := backupstatus.Get(prefsPath, backupFolder, backupVersion)
 
 	if curBackupStatus == backupstatus.EMPTY {
 		utils.PrintError(`você não fez nenhum backup. execute "spot backup" antes de aplicar.`)
@@ -34,10 +34,14 @@ func Apply() {
 	appFolder := filepath.Join(spotifyPath, "Apps")
 	status := spotifystatus.Get(spotifyPath)
 
+	extractedStock := false
+
 	if status != spotifystatus.APPLIED {
 		os.RemoveAll(appFolder)
 
 		utils.Copy(rawFolder, appFolder, true, nil)
+
+		extractedStock = true
 	}
 
 	replaceColors := settingSection.Key("replace_colors").MustInt(0) == 1
@@ -45,7 +49,7 @@ func Apply() {
 
 	if replaceColors {
 		utils.Copy(themedFolder, appFolder, true, nil)
-	} else {
+	} else if !extractedStock {
 		utils.Copy(rawFolder, appFolder, true, nil)
 	}
 
@@ -82,7 +86,8 @@ func Apply() {
 	pushExtensions(extentionList...)
 
 	utils.PrintSuccess("o spotify progrediu!")
-	utils.RestartSpotify(spotifyPath)
+
+	RestartSpotify()
 }
 
 // updatecss

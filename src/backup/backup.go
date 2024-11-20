@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"../utils"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // fazer backup da pasta spotify apps para backuppath

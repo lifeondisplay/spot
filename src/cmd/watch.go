@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"../status/spotify"
-	"../utils"
+	spotifystatus "github.com/lifeondisplay/spot/src/status/spotify"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // watch
