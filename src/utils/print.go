@@ -35,9 +35,14 @@ func PrintRed(text string) {
 	log.Println("\x1B[31m" + text + "\033[0m")
 }
 
+// negrito
+func Bold(text string) string {
+	return "\x1B[1m" + text + "\033[0m"
+}
+
 // printa uma mensagem em negrito
 func PrintBold(text string) {
-	log.Println("\x1B[1m" + text + "\033[0m")
+	log.Println(Bold(text))
 }
 
 // printa uma mensagem e deixa o processo
