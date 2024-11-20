@@ -1,59 +1,59 @@
-$curVer = [regex]::Match((Get-Content ".\src\spot.go"), "version = `"([\d\.]*)`"").Captures.Groups[1].Value
-Write-Host "versão atual: $curVer"
+$curVer = [regex]::Match((Get-Content ".\spot.go"), "version = `"([\d\.]*)`"").Captures.Groups[1].Value
+Write-Host "Current version: $curVer"
 
 function BumpVersion {
     param (
-        [Parameter(Mandatory=$true)][int16]$major,
-        [Parameter(Mandatory=$true)][int16]$minor,
-        [Parameter(Mandatory=$true)][int16]$patch
+        [Parameter(Mandatory = $true)][int16]$major,
+        [Parameter(Mandatory = $true)][int16]$minor,
+        [Parameter(Mandatory = $true)][int16]$patch
     )
 
     $ver = "$($major).$($minor).$($patch)"
 
-    (Get-Content ".\src\spot.go") -replace "version = `"[\d\.]*`"", "version = `"$($ver)`"" |
-        Set-Content ".\src\spot.go"
+    (Get-Content ".\spot.go") -replace "version = `"[\d\.]*`"", "version = `"$($ver)`"" |
+        Set-Content ".\spot.go"
 }
 
 function Dist {
     param (
-        [Parameter(Mandatory=$true)][int16]$major,
-        [Parameter(Mandatory=$true)][int16]$minor,
-        [Parameter(Mandatory=$true)][int16]$patch
+        [Parameter(Mandatory = $true)][int16]$major,
+        [Parameter(Mandatory = $true)][int16]$minor,
+        [Parameter(Mandatory = $true)][int16]$patch
     )
 
     BumpVersion $major $minor $patch
 
-    $nameVersion="spot-$($major).$($minor).$($patch)"
-    $env:GOARCH="amd64"
+    $nameVersion = "spot-$($major).$($minor).$($patch)"
+    $env:GOARCH = "amd64"
 
     if (Test-Path "./bin") {
         Remove-Item -Recurse "./bin"
     }
 
-    Write-Host "construindo binários do linux:"
-    $env:GOOS="linux"
+    Write-Host "Building Linux binary:"
+    $env:GOOS = "linux"
 
-    go build -o "./bin/linux/spot" "./src/spot.go"
+    go build -o "./bin/linux/spot"
 
-    7z a -bb0 "./bin/linux/$(nameVersion)-linux-amd64.tar" "./bin/linux/*" "./Themes" "./jsHelper" >$null 2>&1
-    7z a -bb0 -sdel -mx9 "./bin/$(nameVersion)-linux-amd64.tar.gz" "./bin/linux/$($nameVersion)-linux-amd64.tar" >$null 2>&1
+    7z a -bb0 "./bin/linux/$($nameVersion)-linux-amd64.tar" "./bin/linux/*" "./Extensions" "./Themes" "./jsHelper" "globals.d.ts" >$null 2>&1
+    7z a -bb0 -sdel -mx9 "./bin/$($nameVersion)-linux-amd64.tar.gz" "./bin/linux/$($nameVersion)-linux-amd64.tar" >$null 2>&1
     Write-Host "✔" -ForegroundColor Green
 
-    Write-Host "construindo binários do macos:"
-    $env:GOOS="darwin"
+    Write-Host "Building MacOS binary:"
+    $env:GOOS = "darwin"
 
-    go build -o "./bin/darwin/spot" "./src/spot.go"
+    go build -o "./bin/darwin/spot"
 
-    7z a -bb0 "./bin/darwin/$(nameVersion)-darwin-amd64.tar" "./bin/darwin/*" "./Themes" "./jsHelper" >$null 2>&1
-    7z a -bb0 -sdel -mx9 "./bin/$(nameVersion)-darwin-amd64.tar.gz" "./bin/darwin/$($nameVersion)-darwin-amd64.tar" >$null 2>&1
+    7z a -bb0 "./bin/darwin/$($nameVersion)-darwin-amd64.tar" "./bin/darwin/*" "./Extensions" "./Themes" "./jsHelper" "globals.d.ts" >$null 2>&1
+    7z a -bb0 -sdel -mx9 "./bin/$($nameVersion)-darwin-amd64.tar.gz" "./bin/darwin/$($nameVersion)-darwin-amd64.tar" >$null 2>&1
     Write-Host "✔" -ForegroundColor Green
 
-    Write-Host "construindo binários do windows:"
-    $env:GOOS="windows"
+    Write-Host "Building Windows binary:"
+    $env:GOOS = "windows"
 
-    go build -o "./bin/windows/spot.exe" "./src/spot.go"
+    go build -o "./bin/windows/spot.exe"
 
-    7z a -bb0 -mx9 "./bin/$(nameVersion)-windows-amd64.tar.gz" "./bin/windows/$($nameVersion)-darwin-amd64.tar" >$null 2>&1
+    7z a -bb0 -mx9 "./bin/$($nameVersion)-windows-x64.zip" "./bin/windows/*" "./Extensions" "./Themes" "./jsHelper" "globals.d.ts" >$null 2>&1
     Write-Host "✔" -ForegroundColor Green
 }
 
