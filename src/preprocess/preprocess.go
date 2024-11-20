@@ -464,16 +464,19 @@ this.getAlbumTracks && this.queueTracks && (Spot.addToQueue = async (uri) => {
 	const trackUris = [];
 
 	const add = async (inputUri) => {
-		const uriObj = Spot.LibURI.from(inputUri);
+		const uriObj = Spot.URI.from(inputUri);
+
 		if (!uriObj) {
-			console.error("Invalid URI. Skipped ", inputUri);
+			console.error("uri inválido. pulando ", inputUri);
+
 			return;
 		}
 
-		if (uriObj.type === Spot.LibURI.Type.ALBUM) {
+		if (uriObj.type === Spot.URI.Type.ALBUM) {
 			const tracks = await getAlbumAsync(inputUri);
+
 			trackUris.push(...tracks);
-		} else if (uriObj.type === Spot.LibURI.Type.TRACK || uriObj.type === Spot.LibURI.Type.EPISODE) {
+		} else if (uriObj.type === Spot.URI.Type.TRACK || uriObj.type === Spot.URI.Type.EPISODE) {
 			trackUris.push(inputUri);
 		} else {
 			console.error("Only Track, Album, Episode URIs are accepted. Skipped ", inputUri);
@@ -487,7 +490,7 @@ this.getAlbumTracks && this.queueTracks && (Spot.addToQueue = async (uri) => {
 	}
 
 	if (trackUris.length < 1) {
-		throw "No track to add.";
+		throw "nenhuma faixa para adicionar.";
 	} else {
 		this.queueTracks(trackUris, err2 => {if (err2) throw err2});
 	}
@@ -499,19 +502,23 @@ this.getAlbumTracks && this.removeTracksFromQueue && (Spot.removeFromQueue = asy
 	}
 
 	const indices = new Set();
+
 	const add = async (inputUri) => {
-		const uriObj = Spot.LibURI.from(inputUri);
+		const uriObj = Spot.URI.from(inputUri);
+
 		if (!uriObj) {
-			console.error("Invalid URI. Skipped ", inputUri);
+			console.error("uri inválido. pulando ", inputUri);
+
 			return;
 		}
 
-		if (uriObj.type === Spot.LibURI.Type.ALBUM) {
+		if (uriObj.type === Spot.URI.Type.ALBUM) {
 			const tracks = await getAlbumAsync(inputUri);
+
 			tracks.forEach((trackUri) => {
 				Spot.Queue.next_tracks.forEach((t, i) => t.uri == trackUri && indices.add(i))
 			})
-		} else if (uriObj.type === Spot.LibURI.Type.TRACK || uriObj.type === Spot.LibURI.Type.EPISODE) {
+		} else if (uriObj.type === Spot.URI.Type.TRACK || uriObj.type === Spot.URI.Type.EPISODE) {
 			Spot.Queue.next_tracks.forEach((t, i) => t.uri == inputUri && indices.add(i))
 		} else {
 			console.error("Only Album, Track and Episode URIs are accepted. Skipped ", inputUri);
