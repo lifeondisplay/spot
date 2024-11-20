@@ -139,10 +139,10 @@ func main() {
 func help() {
 	utils.PrintBold("spot v" + version)
 
-	log.Println(utils.Bold("USAGE") +
+	log.Println(utils.Bold("USAGE") + "\n" +
 		"spot [-q] [-e] \x1B[4mcommand\033[0m...\n" +
 		"spot {-c | --config} | {-v | --version} | {-h | --help}\n\n" +
-		utils.Bold("DESCRIÇÃO") +
+		utils.Bold("DESCRIÇÃO") + "\n" +
 		"personalize a interface e a funcionalidade do cliente spotify\n\n" +
 		utils.Bold("COMANDOS") + `
 backup              inicia o backup e o pré-processamento dos arquivos do aplicativo.
