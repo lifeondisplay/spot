@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"../utils"
 	"github.com/go-ini/ini"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // a flag ativa/desativa o recurso adicional
@@ -48,12 +48,24 @@ func AdditionalOptions(appsFolderPath string, flags Flag) {
 					} else if appName == "zlink" {
 						zlinkMod(path, flags)
 					}
+
 				case ".css":
+
 				case ".html":
 					if appName == "zlink" && len(flags.Extension) > 0 {
 						utils.ModifyFile(path, func(content string) string {
+							extensionsHTML := ""
+
 							for _, v := range flags.Extension {
-								content = utils.Replace(content, `</body>`, `<script class="spot-extension" src="`+v+`"></script>${0}`)
+								extensionsHTML += `<script src="` + v + `"></script>` + "\n"
+							}
+
+							if len(extensionsHTML) > 0 {
+								content = utils.Replace(
+									content,
+									`<!\-\-Extension\-\->`,
+									"${0}\n"+extensionsHTML,
+								)
 							}
 
 							return content

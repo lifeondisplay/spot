@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"../utils"
+	"github.com/lifeondisplay/spot/src/utils"
 )
 
 // a flag habilita/desabilita os pré-processos a serem aplicados
@@ -80,7 +80,10 @@ func Start(extractedAppsPath string, flags Flag, callback func(appName string, e
 						}
 
 						if appName == "zlink" && flags.ExposeAPIs {
-							content = utils.Replace(content, `(<script src="init\.js"></script>)`, `${1}<script type="text/javascript" src="/spotWrapper.js"></script>`)
+							content = utils.Replace(content, `<script src="init\.js"></script>`, `${0}
+	<script src="spotWrapper.js"></script>
+	<!--extensão-->
+`)
 						}
 
 						return content
@@ -381,12 +384,13 @@ func exposeAPIs(input string) string {
 		id: this._pageId,
 		uri: ${2}.getURI(),
 		isEmbeddedApp: this.isEmbeddedApp(),
-		container: this.getContainer(),
+		container: this.getContainer()
 	};
 
 	const eventCB = ({data: info}) => {
-		if (info && info.type === "notify_ready") {
+		if (info && info.type === "notify_loaded") {
 			Spot.Player.dispatchEvent(appEvent);
+
 			window.removeEventListener("message", eventCB)
 		}
 	};
