@@ -7,13 +7,13 @@ import (
 	"os"
 	"runtime"
 
-	"./cmd"
-	"./utils"
-	"gopkg.in/mattn/go-colorable.v0"
+	"github.com/lifeondisplay/spot/src/cmd"
+	"github.com/lifeondisplay/spot/src/utils"
+	colorable "gopkg.in/mattn/go-colorable.v0"
 )
 
 const (
-	version = "0.2.0"
+	version = "0.4.0"
 )
 
 func init() {
@@ -109,6 +109,9 @@ func main() {
 					cmd.Watch()
 				}
 
+			case "restart":
+				cmd.RestartSpotify()
+
 			default:
 				if argv[0] != '-' {
 					utils.PrintError(`comando "` + argv + `" não encontrado.`)
@@ -139,6 +142,7 @@ enable-devtool      ativa as ferramentas de desenvolvedor do spotify. (console, 
 disable-devtool     desativa as ferramentas de desenvolvedor do spotify.
 watch               entra no modo de espectador. automaticamente atualiza o css quando o
                     arquivo color.ini ou user.css for alterado.
+restart				reinicia o cliente spotify.
 
 FLAGS
 -q, --quiet         modo silencioso (sem output).
@@ -156,6 +160,9 @@ func helpConfig() {
 [Setting]
 spotify_path
 	path para o diretório spotify
+
+prefs_path
+	path para o arquivo "prefs" do spotify
 
 current_theme
 	nome da pasta do seu tema
